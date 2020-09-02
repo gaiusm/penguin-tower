@@ -1,0 +1,19 @@
+2020
+
+Release 2.0 the code has been extended to allow for arrows to be
+dropped upon death and also the timed spawn has been introduced.
+Simple conversion of the Python2 code into Python3.
+The code is now in git.
+
+2006
+
+Release 0.1.  Python2 and minimal porting to GNU/Linux.  Extended to
+allow socket connection of many players.
+
+1986
+
+Release 0.02.  MSDOS version.  Interrupt TimerHandler implemented.
+
+1985
+
+Release 0.01.  MSDOS version.  Three player version.

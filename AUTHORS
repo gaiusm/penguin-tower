@@ -1,0 +1,11 @@
+Gaius Mulley <gaiusmod2@gmail.com> wrote this code, the original
+implementation was written during August 1985 and August 1986.  The
+original code worked as an embedded application under MSDOS.  It
+allowed three players, one on the console and two on the serial
+devices com1 and com2.
+
+Since then the code has been ported to GNU/Linux and extended to use
+sockets and a Python3 Pygame front end.  Much of the original code
+remains and most of the code could do with a rewrite and clean up.
+Nevertheless it is pretty easy to extend and it also stresses the
+GNU Modula-2 coroutines library.

@@ -1,0 +1,8 @@
+This directory contains the penguin tower a GNU Modula-2 testcase.
+
+This software is part of the GNU Modula-2 project, as a test application
+which stresses the PIM coroutines library.  All the code is covered by the
+GNU Public License - see COPYING for details.
+
+Please see doc/penguin-tower.info, doc/ptower.texi, doc/ptower.html or
+doc/ptower.pdf for details about this package.
