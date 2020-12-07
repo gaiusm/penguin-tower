@@ -253,7 +253,7 @@ GM2 = @GM2@
 GROFF = @GROFF@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
-INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_PROGRAM = install
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
@@ -811,7 +811,7 @@ all-local: force
 	cd data ; make ALLIMAGES
 
 install-exec-local:
-	echo hello
+	$(INSTALL_PROGRAM) -m 755 src/ptower $(DESTDIR)/$(bindir)
 
 force:
 

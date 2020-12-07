@@ -1,3 +1,7 @@
+2020-12-07       Gaius Mulley <gaius@gnu.org>
+
+	* Makefile.am:  minimal install rule written.
+
 2020-09-02       Gaius Mulley <gaius@gnu.org>
 
 	* version.c:  2.0 released.
