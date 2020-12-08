@@ -1,2 +1,2 @@
 .so tmac.map
-.MAPCHAR 1 1 \S'180'^
+.MAPCHAR 1 1 \\m[mywhite]v\mP

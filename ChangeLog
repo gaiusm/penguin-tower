@@ -1,3 +1,8 @@
+2020-12-08       Gaius Mulley <gaius@gnu.org>
+
+	* data/Makefile.am:  new rules to generate different
+	orientation graphics.
+
 2020-12-07       Gaius Mulley <gaius@gnu.org>
 
 	* Makefile.am:  minimal install rule written.
