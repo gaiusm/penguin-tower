@@ -2,6 +2,8 @@
 
 	* src/Makefile.am: Brought up to date with gcc-13.
 	Added inventory command and GPS treasure.
+	* fonthilltower.py: New file.
+	* botserver.py: New file.
 
 2022-11-20  Gaius Mulley  <gaiusmod2@mail.com>
 
