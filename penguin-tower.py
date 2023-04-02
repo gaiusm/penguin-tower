@@ -13,8 +13,8 @@ xmax            = 40    # character viewable area
 ymax            = 30    # character viewable area
 MaxX            = 800
 MaxY            = 600
-UnitX           = MaxX / xmax  # should = 20 to match png image sizes
-UnitY           = MaxY / ymax  # should = 20 to match png image sizes
+UnitX           = int (MaxX / xmax)  # should = 20 to match png image sizes
+UnitY           = int (MaxY / ymax)  # should = 20 to match png image sizes
 Resolution      = (MaxX, MaxY)
 FontSize        = 24
 StatusWidth     = 180
@@ -33,6 +33,7 @@ programName     = "penguin-tower"
 dataDirectory   = ""
 soundDict       = {}
 connectAttempts = 10
+sound           = True
 
 
 # a severe lack of comments (sorry)
@@ -47,17 +48,18 @@ def getFileName(subdir, filename):
         return os.path.join(dataDirectory, os.path.join(subdir, filename))
 
 def load_sound(name):
+    global sound
     class NoneSound:
         def play(self):
             pass # pass means {} in C, C++ or Java
-    if not pygame.mixer or not pygame.mixer.get_init():
-        return NoneSound()
+    if not sound or not pygame.mixer or not pygame.mixer.get_init():
+        return NoneSound ()
     fullname = getFileName('sounds', name)
     try:
         sound = pygame.mixer.Sound(fullname)
     except pygame.error as message:
         print(('cannot load sound file:', fullname))
-        return NoneSound()
+        return NoneSound ()
     return sound
 
 def load_png(name):
@@ -250,7 +252,7 @@ def doName(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doMap(font, background, name):
@@ -260,7 +262,7 @@ def doMap(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doRoom(font, background, name):
@@ -270,7 +272,7 @@ def doRoom(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doWounds(font, background, name):
@@ -280,7 +282,7 @@ def doWounds(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doFatigue(font, background, name):
@@ -290,7 +292,7 @@ def doFatigue(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doMagic(font, background, name):
@@ -300,7 +302,7 @@ def doMagic(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doArrows(font, background, name):
@@ -310,7 +312,7 @@ def doArrows(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doWeight(font, background, name):
@@ -320,7 +322,7 @@ def doWeight(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doTime(font, background, name):
@@ -330,7 +332,7 @@ def doTime(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doCommand(font, background, ch, desc):
@@ -340,7 +342,7 @@ def doCommand(font, background, ch, desc):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
     text = font.render(desc, 1, White)
@@ -349,7 +351,7 @@ def doCommand(font, background, ch, desc):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def drawWriteLn(name):
@@ -363,7 +365,7 @@ def drawWriteLn(name):
     lineNo = lineNo+1
     columnNo = [0]
     textLine = ""
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
     screen.blit(background, (0, 0))
     pygame.display.flip()
@@ -406,7 +408,7 @@ def doComment1(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doComment2(font, background, name):
@@ -416,7 +418,7 @@ def doComment2(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doComment3(font, background, name):
@@ -426,7 +428,7 @@ def doComment3(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doComment4(font, background, name):
@@ -436,7 +438,7 @@ def doComment4(font, background, name):
     textpos.left = background.get_rect().right-StatusWidth
     blanktext = pygame.Rect(textpos.left, textpos.top,
                             StatusWidth, LineHeight)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
     background.blit(text, textpos)
 
 def doStatus(background):
@@ -465,10 +467,10 @@ def doClear():
     # erase the screen
     # background = pygame.Surface(screen.get_size())
     # background = background.convert()
-    background.fill((0, 0, 0))
+    background.fill(Black)
     # Blit everything to the screen
     lineNo = 0
-    # screen.fill((0, 0, 0))
+    # screen.fill(Black)
     screen.blit(background, (0, 0))
     # screen.blit(background, (0, 0))
     pygame.display.flip()
@@ -487,7 +489,7 @@ def doErase(font, background, x, y):
     blanktext = pygame.Rect(background.get_rect().left+UnitX * x,
                             background.get_rect().top+UnitY * y,
                             UnitX, UnitY)
-    pygame.draw.rect(background, (0, 0, 0), blanktext)
+    pygame.draw.rect(background, Black, blanktext)
 
 def eraseLine(coords):
     global screen, background
@@ -802,10 +804,10 @@ def Usage ():
     sys.exit(0)
 
 def handleArgs ():
-    global fullscreen, versionNumber, serverName, portNumber, debugging, dataDirectory
+    global fullscreen, versionNumber, serverName, portNumber, debugging, dataDirectory, sound
 
     try:
-       optlist, list = getopt.getopt(sys.argv[1:], ':vdhwfI:')
+       optlist, list = getopt.getopt(sys.argv[1:], ':vdhwfI:s')
     except getopt.GetoptError:
        Usage()
        sys.exit(0)
@@ -819,6 +821,8 @@ def handleArgs ():
             fullscreen = FULLSCREEN
         if opt[0] == '-I':
             dataDirectory = opt[1]
+        if opt[0] == '-s':
+            sound = False
         if opt[0] == '-v':
             print(("morlocclient version", versionNumber))
             sys.exit(0)

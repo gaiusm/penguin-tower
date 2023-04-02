@@ -1,4 +1,5 @@
 MODULE Dungeon ;
+(* *)
 
 FROM AdvIntroduction IMPORT StartGame ;
 FROM SArgs IMPORT GetArg ;

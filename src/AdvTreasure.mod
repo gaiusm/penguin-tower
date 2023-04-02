@@ -58,6 +58,8 @@ FROM AdvMap IMPORT Treasure, Rooms, DoorStatus, IncPosition,
 
 FROM AdvMath IMPORT MaxNoOfTreasures, LowFreePool, HighFreePool ;
 
+FROM AdvUtil IMPORT InitialDisplay ;
+
 FROM Screen IMPORT Width, Height,
                    ClearScreen,
                    InitScreen,
@@ -70,7 +72,8 @@ FROM Screen IMPORT Width, Height,
                    DelCommentLine1,
                    DelCommentLine2,
                    DelCommentLine3,
-                   WriteArrows, WriteMagicArrows ;
+                   WriteArrows, WriteMagicArrows,
+                   Pause ;
 
 FROM AdvMath IMPORT MagicKey,
                     CrystalBall,
@@ -89,6 +92,8 @@ FROM AdvMath IMPORT MagicKey,
                     VisionChest,
                     QuiverNormal,
                     QuiverMagic,
+                    HealingPotion,
+                    GlobalPositionSystem,
 
                     UpDateWoundsAndFatigue,
                     DammageByHandGrenade,
@@ -180,6 +185,39 @@ VAR
    qAvailable,
    qMutex           : SEMAPHORE ;
    qThread          : DESCRIPTOR ;
+
+
+PROCEDURE Inventory ;
+VAR
+   p: CARDINAL ;
+   i: CARDINAL ;
+   a: ARRAY [0..30] OF CHAR ;
+BEGIN
+   p := PlayerNo () ;
+   GetReadAccessToPlayer ;
+   GetAccessToScreenNo (p) ;
+   ClearScreen (p) ;
+   WriteString (p, 'In your possession are:') ;
+   WriteString (p, '') ;
+   IF Player[p].TreasureOwn = {}
+   THEN
+      WriteString (p, 'not a lot')
+   ELSE
+      FOR i := 1 TO MaxNoOfTreasures DO
+         IF i IN Player[p].TreasureOwn
+         THEN
+            CardToStr (i, 2, a) ;
+            StrConCat (a, ' ', a) ;
+            StrConCat (a, Treasure[i].TreasureName, a) ;
+            WriteString (p, a)
+         END
+      END
+   END ;
+   ReleaseAccessToScreenNo (p) ;
+   ReleaseReadAccessToPlayer ;
+   Pause (p) ;
+   InitialDisplay
+END Inventory ;
 
 
 PROCEDURE GetTreasure ;
@@ -781,21 +819,22 @@ BEGIN
             WriteCommentLine2(p, Tmessage) ;
             WriteCommentLine3(p, Treasure[TreasNo].TreasureName) ;
             ReleaseAccessToScreenNo(p) ;
-            IF TreasNo=MagicKey        (* Magic Key *)
-            THEN
-               HideDoor
-            ELSIF TreasNo=CrystalBall  (* Crystal Ball *)
-            THEN
-               UseCrystalBall
-            ELSIF TreasNo=HandGrenade  (* Hand Grenade *)
-            THEN
-               PullPin
-            ELSIF TreasNo=TreasTrove
-            THEN
-               DisplayTreasures
-            ELSIF TreasNo=VisionChest
-            THEN
-               DisplayEnemy
+            CASE TreasNo OF
+
+            MagicKey            :  HideDoor |
+            CrystalBall         :  UseCrystalBall |
+            HandGrenade         :  PullPin |
+            TreasTrove          :  DisplayTreasures |
+            VisionChest         :  DisplayEnemy |
+            GlobalPositionSystem:  DisplayPos
+
+            ELSE
+               ReleaseReadAccessToPlayer ;
+               GetAccessToScreenNo(p) ;
+               WriteCommentLine1(p, 'no effect') ;
+               DelCommentLine2(p) ;
+               DelCommentLine3(p) ;
+               ReleaseAccessToScreenNo(p)
             END
          ELSE
             ReleaseReadAccessToPlayer ;
@@ -1080,6 +1119,29 @@ BEGIN
    END
 ********************** *)
 END DisplayEn ;
+
+
+(*
+   DisplayPos - display the position of the calling player.
+*)
+
+PROCEDURE DisplayPos ;
+VAR
+   p   : CARDINAL ;
+   a, n: ARRAY [0..14] OF CHAR ;
+BEGIN
+   p := PlayerNo() ;
+   GetReadAccessToPlayer ;
+   GetAccessToScreenNo (p) ;
+   WriteCommentLine1 (p, 'GPS reports') ;
+   CardToStr (Player[p].Xman, 0, a) ;
+   StrConCat (a, ', ', a) ;
+   CardToStr (Player[p].Yman, 0, n) ;
+   StrConCat (a, n, a) ;
+   WriteCommentLine2 (p, a) ;
+   ReleaseAccessToScreenNo (p) ;
+   ReleaseReadAccessToPlayer
+END DisplayPos ;
 
 
 PROCEDURE DisplayTreasures ;
@@ -1575,23 +1637,25 @@ BEGIN
    PinPulled := InitSemaphore(0, 'PinPulled') ;
    PinHasBeenPulled := FALSE ;
 
-   StrCopy('Magic Key'   , Treasure[MagicKey   ].TreasureName ) ;
-   StrCopy('Crystal Ball', Treasure[CrystalBall].TreasureName ) ;
-   StrCopy('Magic Spring', Treasure[MagicSpring].TreasureName ) ;
-   StrCopy('Sack Of Coal', Treasure[SackOfCoal1].TreasureName ) ;
-   StrCopy('Sack Of Coal', Treasure[SackOfCoal2].TreasureName ) ;
-   StrCopy('Hot Iron'    , Treasure[HotIron    ].TreasureName ) ;
-   StrCopy('Hand Grenade', Treasure[HandGrenade].TreasureName ) ;
-   StrCopy('Magic Sword' , Treasure[MagicSword ].TreasureName ) ;
-   StrCopy('Magic Shoes' , Treasure[MagicShoes ].TreasureName ) ;
-   StrCopy('Sleep Potion', Treasure[SleepPotion].TreasureName ) ;
-   StrCopy('Lump Of Iron', Treasure[LumpOfIron ].TreasureName ) ;
-   StrCopy('Treas. Trove', Treasure[TreasTrove ].TreasureName ) ;
-   StrCopy('Speed Potion', Treasure[SpeedPotion].TreasureName ) ;
-   StrCopy('Magic Shield', Treasure[MagicShield].TreasureName ) ;
-   StrCopy('Vision Chest', Treasure[VisionChest].TreasureName ) ;
-   StrCopy('Arrow Quiver', Treasure[QuiverNormal].TreasureName ) ;
-   StrCopy('Magic Arrows', Treasure[QuiverMagic].TreasureName ) ;
+   StrCopy ('Magic Key'   , Treasure[MagicKey   ].TreasureName) ;
+   StrCopy ('Crystal Ball', Treasure[CrystalBall].TreasureName) ;
+   StrCopy ('Magic Spring', Treasure[MagicSpring].TreasureName) ;
+   StrCopy ('Sack Of Coal', Treasure[SackOfCoal1].TreasureName) ;
+   StrCopy ('Sack Of Coal', Treasure[SackOfCoal2].TreasureName) ;
+   StrCopy ('Hot Iron'    , Treasure[HotIron    ].TreasureName) ;
+   StrCopy ('Hand Grenade', Treasure[HandGrenade].TreasureName) ;
+   StrCopy ('Magic Sword' , Treasure[MagicSword ].TreasureName) ;
+   StrCopy ('Magic Shoes' , Treasure[MagicShoes ].TreasureName) ;
+   StrCopy ('Sleep Potion', Treasure[SleepPotion].TreasureName) ;
+   StrCopy ('Lump Of Iron', Treasure[LumpOfIron ].TreasureName) ;
+   StrCopy ('Treas. Trove', Treasure[TreasTrove ].TreasureName) ;
+   StrCopy ('Speed Potion', Treasure[SpeedPotion].TreasureName) ;
+   StrCopy ('Magic Shield', Treasure[MagicShield].TreasureName) ;
+   StrCopy ('Vision Chest', Treasure[VisionChest].TreasureName) ;
+   StrCopy ('Arrow Quiver', Treasure[QuiverNormal].TreasureName) ;
+   StrCopy ('Magic Arrows', Treasure[QuiverMagic].TreasureName) ;
+   StrCopy ('Salve       ', Treasure[HealingPotion].TreasureName) ;
+   StrCopy ('GPS         ', Treasure[GlobalPositionSystem].TreasureName) ;
 
    initTreasure (MagicKey   ,   0, unused) ;
    initTreasure (CrystalBall,  33, unused) ;
@@ -1608,6 +1672,8 @@ BEGIN
    initTreasure (SpeedPotion,   0, unused) ;   (* was   0 *)
    initTreasure (MagicShield,   2, unused) ;   (* was   2 *)
    initTreasure (VisionChest, 120, unused) ;   (* was 150 *)
+   initTreasure (HealingPotion, 0, unused) ;
+   initTreasure (GlobalPositionSystem, 0, unused) ;
 
    StrCopy('Treasure No xx', Tmessage ) ;
    armedTimer := NIL ;

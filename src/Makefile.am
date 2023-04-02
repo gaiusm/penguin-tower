@@ -1,31 +1,37 @@
 SUFFIXES = .c .mod .def .o .obj .lo .a .bnf .flex
 
-MY_DEPS = AdvCmd.o AdvConnect.o \
-          AdvIntroduction.o AdvMap.o \
-          AdvMath.o AdvParse.o \
-          AdvSound.o AdvSystem.o \
-          AdvTreasure.o AdvUtil.o \
-          AdvParse.o \
-          DrawG.o DrawL.o \
-          Dungeon.o \
-          Lock.o \
-          ProcArgs.o \
-          Screen.o \
-          Window.o \
-          SocketControl.o \
-          advflex.o
+DEPS = AdvCmd.o \
+       AdvIntroduction.o \
+       AdvMap.o \
+       AdvMath.o \
+       AdvSound.o \
+       AdvSystem.o \
+       AdvTreasure.o \
+       AdvUtil.o \
+       AdvParse.o \
+       DrawG.o \
+       DrawL.o \
+       Lock.o \
+       ProcArgs.o \
+       Screen.o \
+       Window.o \
+       SocketControl.o \
+       advflex.o
 
-OPT=-O0 -fm2-g -g
+# OPT=-O0 -fm2-g -g -flto
+OPT=-O0
 CHECK=-fsoft-check-all
-M2FLAGS=$(OPT) $(CHECK) -fextended-opaque -flibs=cor,pim,iso
+DEBUG=-fm2-g -g
+# -flibs=cor,pim,iso
+M2FLAGS=$(OPT) $(CHECK) $(DEBUG) -fextended-opaque -fgen-module-list=-
 
 BUILT_SOURCES = advflex.c
 
 advflex.c: $(srcdir)/adv.flex
 	flex -t $< > $@
 
-ptower$(EXEEXT): $(MY_DEPS)
-	gm2 $(M2FLAGS) -I. -I$(srcdir) $(srcdir)/Dungeon.mod -o $@
+ptower$(EXEEXT): $(DEPS)
+	gm2 $(M2FLAGS) -I. -I$(srcdir) $(srcdir)/Dungeon.mod $(DEPS) -o $@
 
 # $(srcdir)/AdvParse.mod: $(srcdir)/AdvParse.bnf
 

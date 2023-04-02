@@ -5,7 +5,7 @@ DEFINITION MODULE advflex ;
     Author     : Gaius Mulley
     System     : GNU Modula-2
     Date       : Sun Jul 17 12:32:58 2005
-    Revision   : $Version$ 
+    Revision   : $Version$
     Description: provides access to basic lexical functions.
 *)
 

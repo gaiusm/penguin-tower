@@ -1,45 +1,56 @@
-2020-12-08       Gaius Mulley <gaius@gnu.org>
+2023-04-02  Gaius Mulley  <gaiusmod2@mail.com>
 
-	* data/Makefile.am:  new rules to generate different
+	* src/Makefile.am: Brought up to date with gcc-13.
+	Added inventory command and GPS treasure.
+
+2022-11-20  Gaius Mulley  <gaiusmod2@mail.com>
+
+	* src/Makefile.am: Remove AdvConnect.mod from link
+	list.  Add new treasures: healing salve and normal
+	arrows.  Modified to build with gm2 (gcc13).
+
+2020-12-08  Gaius Mulley  <gaius@gnu.org>
+
+	* data/Makefile.am: new rules to generate different
 	orientation graphics.
 
-2020-12-07       Gaius Mulley <gaius@gnu.org>
+2020-12-07  Gaius Mulley  <gaius@gnu.org>
 
-	* Makefile.am:  minimal install rule written.
+	* Makefile.am: minimal install rule written.
 
-2020-09-02       Gaius Mulley <gaius@gnu.org>
+2020-09-02  Gaius Mulley  <gaius@gnu.org>
 
-	* version.c:  2.0 released.
+	* version.c: 2.0 released.
 
-2009-11-08       Gaius Mulley <gaius@gnu.org>
+2009-11-08  Gaius Mulley  <gaius@gnu.org>
 
-	* version.c:  0.5 released.
+	* version.c: 0.5 released.
 	* removed all references to SysVec and changed
           to RTint.  Also replaced references to PRIORITY
           with PROTECTION and altered imports.
 
-2009-10-29       Gaius Mulley <gaius@gnu.org>
+2009-10-29  Gaius Mulley  <gaius@gnu.org>
 
-	* src/SysVec.mod:  removed as it is now in the
+	* src/SysVec.mod: removed as it is now in the
           gm2 release.
-        * Makefile.in:  removed reference to SysVec.mod.
-        * doc/ptower.texi:  updated dates and changed
+        * Makefile.in: removed reference to SysVec.mod.
+        * doc/ptower.texi: updated dates and changed
           moppsy to mcgreg.
-        * configure:  regenerated via autoconf.
-        * version.c:  0.4 released.
+        * configure: regenerated via autoconf.
+        * version.c: 0.4 released.
 
-2008-12-01       Gaius Mulley <gaius@gnu.org>
+2008-12-01  Gaius Mulley  <gaius@gnu.org>
 
 	* many fixes to enable ptower-server to build
           with gm2-0.68
 
-2007-10-26       Gaius Mulley <gaius@gnu.org>
+2007-10-26  Gaius Mulley  <gaius@gnu.org>
 
 	* Makefile.in:  now installs the server and maps.
 	* penguin-tower.py:  iterates over 10 successive
 	  socket numbers looking for the server.
 
-2007-10-26       Gaius Mulley <gaius@gnu.org>
+2007-10-26  Gaius Mulley  <gaius@gnu.org>
 
 	* configure.in:  tests for groff, gm2, flex.
 	* Makefile.in:  now builds the server.
@@ -49,7 +60,7 @@
 	  tree.
 	* server compiles with gcc-4.1.2 and gm2-0.62
 
-2006-10-27       Gaius Mulley <gaius@gnu.org>
+2006-10-27  Gaius Mulley  <gaius@gnu.org>
 
 	* added COPYING, README and ChangeLog to CVS
 	* release 0.1

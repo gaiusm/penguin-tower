@@ -67,7 +67,7 @@ TYPE
    Man = RECORD
             ManName         : ARRAY [0..9] OF CHAR ;
             DeathType       : TypeOfDeath ;(* How man died!        *)
-            Weight          : CARDINAL ;   (* Mans Weight in lbs   *)
+            Weight          : CARDINAL ;   (* Mans Weight in Kgs   *)
             Wounds          : CARDINAL ;   (* 0..100  0= Dead!     *)
             Fatigue         : CARDINAL ;   (* 0..100  0= V Tired   *)
             TreasureOwn     : BITSET ;     (* Treasures that own   *)

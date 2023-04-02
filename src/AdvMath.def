@@ -40,6 +40,7 @@ EXPORT QUALIFIED RequiredToParry,
                  QuiverNormal,
                  QuiverMagic,
                  HealingPotion,
+                 GlobalPositionSystem,
                  LowFreePool,
                  HighFreePool,
                  MaxNoOfTreasures,
@@ -94,10 +95,11 @@ CONST
    QuiverNormal          =  16 ;
    QuiverMagic           =  17 ;
    HealingPotion         =  18 ;
+   GlobalPositionSystem  =  19 ;
 
    MaxNoOfTreasures      =  31 ;  (* An upper limit *)
    HighFreePool          = MaxNoOfTreasures ;
-   LowFreePool           =  19 ;  (* start of dynamic treasures. (see AdvMath.def for static list).  *)
+   LowFreePool           =  20 ;  (* start of dynamic treasures. (see AdvMath.def for static list).  *)
 
 TYPE
    FreePool     = [LowFreePool..HighFreePool] ;

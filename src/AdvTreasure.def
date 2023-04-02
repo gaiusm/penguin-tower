@@ -4,7 +4,7 @@ FROM AdvMap IMPORT TreasureKind ;
 
 EXPORT QUALIFIED GetTreasure, DropTreasure, UseTreasure,
                  Grenade, DisplayEnemy, ScatterTreasures,
-                 RespawnTreasure, RespawnArrow ;
+                 RespawnTreasure, RespawnArrow, Inventory ;
 
 
 PROCEDURE GetTreasure ;
@@ -17,6 +17,7 @@ PROCEDURE RespawnTreasure (seedRoom: CARDINAL; tno: CARDINAL; ticks: CARDINAL) ;
 PROCEDURE RespawnArrow (seedRoom: CARDINAL; tno: CARDINAL;
                         spawnKind, arrowKind: TreasureKind;
                         amount: CARDINAL; ticks: CARDINAL) ;
+PROCEDURE Inventory ;
 
 
 END AdvTreasure.

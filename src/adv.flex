@@ -1,5 +1,5 @@
 %{
-/* Copyright (C) 2004 Free Software Foundation, Inc.
+/* Copyright (C) 2022 Free Software Foundation, Inc.
    This file is part of GNU Modula-2.
 
 GNU Modula-2 is free software; you can redistribute it and/or modify it under
@@ -45,7 +45,9 @@ static  void poperrorskip       (const char *);
 	int  advflex_GetLineNo  (void);
 	void advflex_CloseSource(void);
 	char *advflex_GetToken  (void);
-        void _M2_advflex_init   (void);
+        void _M2_advflex_init   (int, char *, char *);
+        void _M2_advflex_finish (int, char *, char *);
+        void _M2_advflex_ctor   (void);
 extern  void  yylex             (void);
 
 #if !defined(TRUE)
@@ -237,8 +239,17 @@ int yywrap (void)
   updatepos(); return 1;
 }
 
-void _M2_advflex_init (void) {}
-void _M2_advflex_finish (void) {}
+void _M2_advflex_init (int, char *, char *)
+{
+}
+
+void _M2_advflex_finish (int, char *, char *)
+{
+}
+
+void _M2_advflex_ctor (void)
+{
+}
 
 #if 0
 main () {

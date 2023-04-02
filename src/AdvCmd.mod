@@ -6,7 +6,7 @@ FROM Storage IMPORT ALLOCATE ;
 
 FROM AdvMap IMPORT IncPosition ;
 FROM DrawG IMPORT DrawMan, EraseMan ;
-FROM AdvTreasure IMPORT GetTreasure, DropTreasure, UseTreasure ;
+FROM AdvTreasure IMPORT GetTreasure, DropTreasure, UseTreasure, Inventory ;
 FROM ProcArgs IMPORT SetArgs ;
 
 FROM AdvSystem IMPORT ArrowArgs,
@@ -67,6 +67,7 @@ BEGIN
          CASE ch OF
 
          'h'  : Help |
+         'i'  : Inventory |
          'v'  : ValtTurn |
          'r'  : RightTurn |
          'l'  : LeftTurn |

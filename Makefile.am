@@ -9,8 +9,8 @@ INSTALL_PROGRAM = install
 dist_doc_DATA = README
 
 all-local: force
-	cd src ; make ptower$(EXEEXT)
 	cd data ; make ALLIMAGES
+	cd src ; make ptower$(EXEEXT)
 
 install-exec-local:
 	$(INSTALL_PROGRAM) -m 755 src/ptower $(DESTDIR)/$(bindir)

@@ -1,5 +1,5 @@
-break M2RTS_Halt
-break M2RTS_HALT
+break m2pim_M2RTS_Halt
+break m2pim_M2RTS_HALT
 break exit
 break advflex_error
 # break AdvUtil.mod:1399
