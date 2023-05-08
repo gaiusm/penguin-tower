@@ -28,7 +28,7 @@ textLine        = ""
 fullscreen      = 0
 serverName      = "localhost"
 portNumber      = 7000
-debugging       = 0
+debugging       = False
 programName     = "penguin-tower"
 dataDirectory   = ""
 soundDict       = {}
@@ -516,10 +516,12 @@ def doFlush():
     screen.blit(background, (0, 0))
     pygame.display.flip()
 
-def processLine(line):
+def processLine (line, in_combat):
     global font, background
 
     cmd = line.split ()
+    if line == 'combat':
+        return True
     if line == 'sync':
         doSync()
     elif line == 'fl':
@@ -613,6 +615,7 @@ def processLine(line):
             print(("Warning unknown command ", line))
     else:
         print(("Warning unknown command ", line))
+    return in_combat
 
 def playSound(sound):
     global soundDict
@@ -711,39 +714,91 @@ def connectServer(id, count):
                 pygame.event.post(pygame.event.Event(USEREVENT, serverLine='abort'))
                 sys.exit(0)
 
-    f = sckt.makefile("rb")
+    f = sckt.makefile ("rb")
     line = stripcrlf(f.readline().decode ('utf-8'))
     while line:
-        if debugging == 1:
+        if debugging:
             print(line)
         pygame.event.post(pygame.event.Event(USEREVENT, serverLine=line))
         pygame.time.set_timer(USEREVENT, 0)
         # pygame.time.delay(200)
         # line = s.readline()
         line = stripcrlf(f.readline().decode ('utf-8'))
-    if debugging == 1:
+    if debugging:
         print(("line =", line, " thus stopping"))
     pygame.event.post(pygame.event.Event(USEREVENT, serverLine="quit"))
     pygame.time.set_timer(USEREVENT, 0)
 
+
+def handle_direction (direction, sckt, newdir):
+    if direction == newdir:
+        sckt.send('1'.encode ('utf-8'))
+        return direction, sckt
+    else:
+        direction = (direction + 4 - newdir) % 4
+        if direction == 2:
+            sckt.send('v'.encode ('utf-8'))
+        elif direction == 1:
+            sckt.send('l'.encode ('utf-8'))
+        else:
+            sckt.send('r'.encode ('utf-8'))
+    return newdir, sckt
+
+
+def update_direction (direction, key):
+    if key == 'r':
+        return (direction + 1) % 4
+    if key == 'l':
+        return (direction + 3) % 4
+    if key == 'v':
+        return (direction + 2) % 4
+    return direction
+
+
 def initEventLoop():
     global sckt, debugging
 
-    _thread.start_new(connectServer, (1, connectAttempts))
+    in_combat = False
+    _thread.start_new (connectServer, (1, connectAttempts))
+    direction = 0
+    direction_dict = {
+        pygame.K_LEFT: 3,
+        pygame.K_RIGHT: 1,
+        pygame.K_UP: 0,
+        pygame.K_DOWN: 2,
+    }
+    push_back = "\nhuman\n"
+    sckt_ready = False
     while True:
-        for event in pygame.event.get():
+        for event in pygame.event.get ():
+            if sckt_ready and len (push_back) > 0:
+                sckt.send (push_back[0].encode ('utf-8'))
+                if len (push_back) == 1:
+                    push_back = ""
+                else:
+                    push_back = push_back[1:]
             if (event.type == KEYDOWN):
-                # print "key is", event.key, pygame.key.name(event.key)
-                if event.key<256:
-                    sckt.send(chr(event.key).encode ('utf-8'))
+                if in_combat:
+                    if event.key == pygame.K_F11:
+                        pygame.display.toggle_fullscreen ()
+                    elif event.key == pygame.K_F12:
+                        sckt.send ("~!".encode ('utf-8'))
+                    if event.key in direction_dict:
+                        direction, sckt = handle_direction (direction, sckt, direction_dict[event.key])
+                    elif event.key<256:
+                        direction = update_direction (direction, chr(event.key))
+                        sckt.send(chr(event.key).encode ('utf-8'))
+                else:
+                    sckt.send (chr (event.key).encode ('utf-8'))
                 if (event.key == K_ESCAPE):
                     screen = pygame.display.set_mode((640, 480))
                     sys.exit(0)
             elif event.type == USEREVENT:
                 line = event.serverLine
-                if debugging == 1:
+                if debugging:
                     print(("about to process", line))
-                processLine(line)
+                in_combat = processLine (line, in_combat)
+                sckt_ready = True
                 if line != 'sync':
                     historyList.append([line, pygame.time.get_ticks()])
                 if line == 'quit':
@@ -765,7 +820,7 @@ def replayHistory():
         processLine(t[0])
 
 def getAnswer():
-    while 1:
+    while True:
         for event in pygame.event.get():
             if (event.type == KEYUP) or (event.type == KEYDOWN):
                 if (event.key == K_y):
@@ -816,7 +871,7 @@ def handleArgs ():
         if opt[0] == '-h':
             Usage()
         if opt[0] == '-d':
-            debugging = 1
+            debugging = True
         if opt[0] == '-w' or opt[0] == '-f':
             fullscreen = FULLSCREEN
         if opt[0] == '-I':

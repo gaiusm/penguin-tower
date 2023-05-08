@@ -13,8 +13,6 @@ FROM Storage IMPORT ALLOCATE ;
 FROM Assertion IMPORT Assert ;
 
 FROM AdvSystem IMPORT MaxNoOfPlayers,
-                      ManWeight,
-                      Man,
                       TypeOfDeath,
                       Player,
                       PlayerSet,
@@ -56,9 +54,10 @@ FROM AdvMap IMPORT Treasure, Rooms, DoorStatus, IncPosition,
                    TreasureKind, Treasure,
                    ActualNoOfRooms ;
 
-FROM AdvMath IMPORT MaxNoOfTreasures, LowFreePool, HighFreePool ;
+FROM AdvMath IMPORT MaxNoOfTreasures, LowFreePool, HighFreePool,
+                    GetDamageHotIron, GetDamageHandGrenadePlayer ;
 
-FROM AdvUtil IMPORT InitialDisplay ;
+FROM AdvUtil IMPORT InitialDisplay, ClosedToTimedDoor, TimedDoorToSecret ;
 
 FROM Screen IMPORT Width, Height,
                    ClearScreen,
@@ -95,9 +94,7 @@ FROM AdvMath IMPORT MagicKey,
                     HealingPotion,
                     GlobalPositionSystem,
 
-                    UpDateWoundsAndFatigue,
-                    DammageByHandGrenade,
-                    DammageByHotIron ;
+                    UpDateWoundsAndFatigue ;
 
 
 FROM DrawG IMPORT DrawTreasure, EraseTreasure, EraseMan, DrawMan ;
@@ -105,7 +102,7 @@ FROM DrawL IMPORT DrawRoom, DrawAllPlayers ;
 FROM AdvSound IMPORT Explode ;
 
 FROM AdvUtil IMPORT PointOnWall, GetDoorOnPoint, PointOnTreasure,
-                    HideDoor, RandomRoom, PositionInRoom, InitialDisplay,
+                    RandomRoom, PositionInRoom, InitialDisplay,
                     FreeOfPlayersAndTreasure, Dead ;
 
 
@@ -114,58 +111,65 @@ FROM AdvUtil IMPORT PointOnWall, GetDoorOnPoint, PointOnTreasure,
 (*                                                                   *)
 (* The treasures are as follows:                                     *)
 (*                                                                   *)
-(* 1:  Magic Key           - This treasures allows one to make a     *)
+(* 1:  Magic Key           - This treasures allows player to make a  *)
 (*                           closed door into a secret door          *)
 (*                                                                   *)
-(* 2:  Crystal Ball        - This treasure allows one to get the     *)
+(* 2:  Crystal Ball        - This treasure allows player to get the  *)
 (*                           direction and Room No of the other      *)
-(*                           players                                 *)
+(*                           players.                                *)
 (*                                                                   *)
-(* 3:  Magic Spring        - When Grabbed, it springs one to another *)
-(*                           random picked room                      *)
+(* 3:  Magic Spring        - When Grabbed, it springs player to      *)
+(*                           another random picked room.             *)
 (*                                                                   *)
 (* 4:  Sack Of Coal        - When Grabbed, it insists that it must   *)
 (*                           be taken to a randomly picked room      *)
-(*                           before it can be dropped                *)
+(*                           before it can be dropped.               *)
 (*                                                                   *)
-(* 5:  Sack Of Coal        - Ditto                                   *)
+(* 5:  Sack Of Coal        - Ditto.                                  *)
 (*                                                                   *)
-(* 6:  Hot Iron            - Scolds one if picked up                 *)
+(* 6:  Hot Iron            - Scolds player if picked up.             *)
 (*                                                                   *)
 (* 7:  Hand Grenade        - If used will blow up whole room in      *)
-(*                           25 seconds                              *)
+(*                           25 seconds.                             *)
 (*                                                                   *)
-(* 8:  Magic Sword         - Enables one to fight with ease          *)
+(* 8:  Magic Sword         - Enables player to fight with ease.      *)
 (*                                                                   *)
-(* 9:  Magic Shoes         - Enable one to run with minimal effort   *)
-(*                                                                   *)
-(* 10: Sleep Potion        - Makes one fall to sleep for 24 seconds  *)
-(*                                                                   *)
+(* 9:  Magic Shoes         - Enable player to run with minimal       *)
+(*                           effort.                                 *)
+(* 10: Sleep Potion        - Makes player fall to sleep for 24       *)
+(*                           seconds.                                *)
 (* 11: Lump Of Iron        - When picked up scatters all treasure in *)
 (*                           current room.                           *)
 (*                                                                   *)
-(* 12: Treasure Trove      - Tells one where or who has the          *)
+(* 12: Treasure Trove      - Tells player where or who has the       *)
 (*                           treasures.                              *)
 (*                                                                   *)
-(* 13: Speed Potion        - Increases ones responce time.           *)
+(* 13: Speed Potion        - Increases player responce time.         *)
 (*                                                                   *)
 (* 14: Magic Shield        - Repels Normal Arrows.                   *)
 (*                                                                   *)
-(* 15: Vision Chest        - Allows one to see enemies screen.       *)
+(* 15: Vision Chest        - Allows player to see enemies screen.    *)
 
 
 CONST
-   respawnStack          = 10 * 1024 * 1024 ;
+   respawnStack          = 30 * 1024 * 1024 ;
    RespawnArrowTime      = 13 ;   (* seconds delay between respawning more arrow treasures 16/17.    *)
    RespawnArrowInventory = 20 ;   (* seconds delay between respawning inventory arrows after death.  *)
    RespawnMagicInventory = 30 ;   (* seconds delay between respawning inventory magic arrows after death.  *)
+   Debugging             = TRUE ;
+   EnableRespawn         = FALSE ;
+   MaxPreallocDesc       = 100 ;  (* How many QDesc should we pre-allocate?  *)
 
 TYPE
    QDesc = POINTER TO RECORD
                          right: QDesc ;
                          Rm,
                          tno   : CARDINAL ;
-                         kind  : TreasureKind ;
+                         CASE kind: TreasureKind OF
+
+                         timeddoor: x, y, dir: CARDINAL |
+
+                         END ;
                          amount,
                          ticks : CARDINAL ;
                       END ;
@@ -199,12 +203,12 @@ BEGIN
    ClearScreen (p) ;
    WriteString (p, 'In your possession are:') ;
    WriteString (p, '') ;
-   IF Player[p].TreasureOwn = {}
+   IF Player[p].Entity.TreasureOwn = {}
    THEN
       WriteString (p, 'not a lot')
    ELSE
       FOR i := 1 TO MaxNoOfTreasures DO
-         IF i IN Player[p].TreasureOwn
+         IF i IN Player[p].Entity.TreasureOwn
          THEN
             CardToStr (i, 2, a) ;
             StrConCat (a, ' ', a) ;
@@ -223,24 +227,22 @@ END Inventory ;
 PROCEDURE GetTreasure ;
 VAR
    p, r : CARDINAL ;
-   died : BOOLEAN ;
    Tno  : CARDINAL ;
 BEGIN
    p := PlayerNo() ;
    GetWriteAccessToPlayer ;
    Tno := GetTreasure1(p) ;
-   (* Only way so far to die directly from getting treasures.         *)
-   died := (Player[p].DeathType=fireball) ;
    r := Player[p].RoomOfMan ;
    ReleaseWriteAccessToPlayer ;
    IF Tno=SleepPotion
    THEN
       (* must not sleep holding the lock.  *)
-      Sleep(24*TicksPerSecond)
+      Sleep (24*TicksPerSecond)
    END ;
-   IF died
+   IF Player[p].Entity.DeathType # living
    THEN
-      Dead(p, r)
+      printf ("player died while holding the sleep potion\n") ;
+      Dead (p, r)
    END
 END GetTreasure ;
 
@@ -342,7 +344,7 @@ BEGIN
       THEN
          pickUp (p, r, TreasNo) ;
          GetAccessToScreenNo (p) ;
-         WriteWeight (p, Weight) ;
+         WriteWeight (p, Entity.Weight) ;
          ReleaseAccessToScreenNo (p) ;
       END ;
       EXCL (Rooms[r].Treasures, TreasNo) ; (* Room no longer has treasure *)
@@ -353,66 +355,68 @@ BEGIN
          (* Magic Spring - Springs treasure and player into different      *)
          (*                rooms.                                          *)
 
-         EraseMan(p) ;
+         EraseMan (p) ;
+         (*
          REPEAT
             RandomNumber(r, ActualNoOfRooms) ;  (* r>=0 & r<=ActualNoOfRooms-1 *)
             INC(r) ;
-            RandomRoom(r, NoOfRoomsToSpring, tr) ;
-            PositionInRoom(tr, tx, ty, ok)
+            RandomRoom (r, NoOfRoomsToSpring, tr) ;
+            PositionInRoom (tr, tx, ty, ok)
          UNTIL ok ;
+         *)
+         (* is the following code the same as above *)
+         tr := r ;
+         ok := RandomDrop (tr, tx, ty) ;
+
          RoomOfMan := tr ;
          Xman := tx ;
          Yman := ty ;
          ScreenX := tx-(tx MOD Width) ;
          ScreenY := ty-(ty MOD Height) ;
-         DrawMan(p) ;
+         DrawMan (p) ;
          IF RandomDrop (tr, tx, ty)
          THEN
-            WITH Treasure[TreasNo] DO
-               Rm := tr ;
-               Xpos := tx ;
-               Ypos := ty
-            END
+            dropDown (tr, TreasNo, tx, ty)
          END ;
          INCL(Rooms[tr].Treasures, TreasNo) ; (* Room has treasure *)
          DrawTreasure(tr, tx, ty) ;
          ReDraw := TRUE
-      ELSIF (TreasNo=SackOfCoal1) OR (TreasNo=SackOfCoal2)  (* Sacks Of Coal *)
+      ELSIF (TreasNo = SackOfCoal1) OR (TreasNo = SackOfCoal2)  (* Sacks Of Coal *)
       THEN
-         RandomNumber(r, ActualNoOfRooms) ;
-         INC(r) ;
-         RandomRoom(r, NoOfRoomsToHideCoal, tr) ;
+         RandomNumber (r, ActualNoOfRooms) ;
+         INC (r) ;
+         RandomRoom (r, NoOfRoomsToHideCoal, tr) ;
          SackOfCoal[TreasNo-SackOfCoal1] := tr ;
-         StrCopy('to room ', a ) ;
-         CardToStr(tr, 4, b) ;
-         StrConCat(a, b, a) ;
-         GetAccessToScreenNo(p) ;
-         WriteCommentLine3(p, a) ;
-         ReleaseAccessToScreenNo(p)
-      ELSIF TreasNo=HotIron             (* Hot iron      *)
+         StrCopy ('to room ', a ) ;
+         CardToStr (tr, 4, b) ;
+         StrConCat (a, b, a) ;
+         GetAccessToScreenNo (p) ;
+         WriteCommentLine3 (p, a) ;
+         ReleaseAccessToScreenNo (p)
+      ELSIF TreasNo = HotIron             (* Hot iron      *)
       THEN
-         GetAccessToScreenNo(p) ;
-         WriteCommentLine1(p, 'ouch') ;
-         WriteCommentLine2(p, 'fire ball') ;
-         WriteCommentLine3(p, 'hit thee') ;
-         IF DammageByHotIron>Wounds
+         GetAccessToScreenNo (p) ;
+         WriteCommentLine1 (p, 'ouch') ;
+         WriteCommentLine2 (p, 'fire ball') ;
+         WriteCommentLine3 (p, 'hit thee') ;
+         IF GetDamageHotIron () > Entity.Wounds
          THEN
-            Wounds := 0 ;
-            DeathType := fireball
+            Entity.Wounds := 0 ;
+            Entity.DeathType := fireball
          ELSE
-            DEC(Wounds, DammageByHotIron)
+            DEC (Entity.Wounds, GetDamageHotIron ())
          END ;
-         WriteWounds(p, Wounds) ;
-         ReleaseAccessToScreenNo(p)
+         WriteWounds (p, Entity.Wounds) ;
+         ReleaseAccessToScreenNo (p)
       ELSIF TreasNo=LumpOfIron
       THEN
-         ScatterAllTreasures(p, RoomOfMan)
-      ELSIF TreasNo=SpeedPotion
+         ScatterAllTreasures (p, RoomOfMan)
+      ELSIF TreasNo = SpeedPotion
       THEN
          (* PutPriority(CurrentProcess, User, 4) *)
-      ELSIF (TreasNo=QuiverNormal) OR (TreasNo=QuiverMagic)
+      ELSIF (TreasNo = QuiverNormal) OR (TreasNo = QuiverMagic)
       THEN
-         IF TreasNo=QuiverNormal
+         IF TreasNo = QuiverNormal
          THEN
             INC (NoOfNormal, 6) ;
             GetAccessToScreenNo (p) ;
@@ -463,11 +467,11 @@ BEGIN
          IF IsPlayerActive(tp)
          THEN
             WITH Player[tp] DO
-               IF (i IN TreasureOwn) AND (r=RoomOfMan)
+               IF (i IN Entity.TreasureOwn) AND (r=RoomOfMan)
                THEN
                   REPEAT
-                     RandomRoom(r, NoOfRoomsToSpring, tr) ;
-                     PositionInRoom(tr, x, y, ok)
+                     RandomRoom (r, NoOfRoomsToSpring, tr) ;
+                     PositionInRoom (tr, x, y, ok)
                   UNTIL ok ;
                   putDown (tp, tr, i, x, y) ;
                   printf ("treasure %d is in room %d at %d,%d\n", i, tr, x, y)
@@ -478,8 +482,8 @@ BEGIN
       IF Treasure[i].Rm=r
       THEN
          REPEAT
-            RandomRoom(r, NoOfRoomsToSpring, tr) ;
-            PositionInRoom(tr, x, y, ok)
+            RandomRoom (r, NoOfRoomsToSpring, tr) ;
+            PositionInRoom (tr, x, y, ok)
          UNTIL ok ;
          printf ("treasure %d is in room %d at %d,%d\n", i, tr, x, y) ;
          WITH Treasure[i] DO
@@ -499,23 +503,23 @@ BEGIN
       IF IsPlayerActive(tp)
       THEN
          WITH Player[tp] DO
-            IF (TreasureOwn#{}) AND (RoomOfMan=r)
+            IF (Entity.TreasureOwn#{}) AND (RoomOfMan=r)
             THEN
                (* Now undo treasures which have an automatic effect *)
-               IF SpeedPotion IN TreasureOwn
+               IF SpeedPotion IN Entity.TreasureOwn
                THEN
                   (* PutPriority(PlayerProcess(p), User, 3) *)
                END ;
 
-               TreasureOwn := {} ;
-               GetAccessToScreenNo(tp) ;
+               Entity.TreasureOwn := {} ;
+               GetAccessToScreenNo (tp) ;
 
-               WriteWeight(p, Weight) ;
-               WriteCommentLine1(p, 'thy burdens') ;
-               WriteCommentLine2(p, 'hast been') ;
-               WriteCommentLine3(p, 'lifted') ;
+               WriteWeight (p, Entity.Weight) ;
+               WriteCommentLine1 (p, 'thy burdens') ;
+               WriteCommentLine2 (p, 'hast been') ;
+               WriteCommentLine3 (p, 'lifted') ;
 
-               ReleaseAccessToScreenNo(tp)
+               ReleaseAccessToScreenNo (tp)
             END
          END
       END
@@ -523,49 +527,63 @@ BEGIN
 END ScatterAllTreasures ;
 
 
-PROCEDURE ScatterTreasures (p, r: CARDINAL) ;
+PROCEDURE SilentScatterTreasures (p, r: CARDINAL) ;
 VAR
    c       : INTEGER ;
    x, y, i : CARDINAL ;
    ok      : BOOLEAN ;
 BEGIN
+   IF Debugging
+   THEN
+      printf ("scatter treasures\n")
+   END ;
    WITH Player[p] DO
       FOR i := 1 TO MaxNoOfTreasures DO
-         IF i IN TreasureOwn
+         IF i IN Entity.TreasureOwn
          THEN
+            IF Debugging
+            THEN
+               printf ("  treasure %d\n", i)
+            END ;
+
             (* Now undo treasures which have an automatic effect *)
-            IF SpeedPotion IN TreasureOwn
+            IF SpeedPotion IN Entity.TreasureOwn
             THEN
                (* PutPriority(PlayerProcess(p), User, 3) *)
             END ;
 
             REPEAT
-               PositionInRoom(r, x, y, ok) ;
+               PositionInRoom (r, x, y, ok) ;
                IF ok
                THEN
-                  WITH Treasure[i] DO
-                     DEC(Weight, Tweight) ;
-                     Xpos := x ;
-                     Ypos := y ;
-                     Rm := r
-                  END ;
-                  DrawTreasure(r, x, y) ;
-                  INCL(Rooms[r].Treasures, i) ;
+                  putDown (p, r, i, x, y) ;
+                  IF fd # -1
+                  THEN
+                     DrawTreasure (r, x, y)
+                  END
                ELSE
-                  c := printf('trying another room\n') ;
-                  RandomRoom(r, 1, x) ;
+                  printf ('trying another room\n') ;
+                  RandomRoom (r, 1, x) ;
                   r := x
                END
             UNTIL ok
          END
       END ;
-      TreasureOwn := {} ;
+      Entity.TreasureOwn := {} ;
       (* and respawn arrows.  *)
       RespawnArrow (r, 0, respawnmagic, magic, NoOfMagic, TicksPerSecond * RespawnMagicInventory) ;
-      RespawnArrow (r, 0, respawnnormal, normal, NoOfNormal, TicksPerSecond * RespawnArrowInventory) ;
-      GetAccessToScreenNo(p) ;
-      WriteWeight(p, Weight) ;
-      ReleaseAccessToScreenNo(p)
+      RespawnArrow (r, 0, respawnnormal, normal, NoOfNormal, TicksPerSecond * RespawnArrowInventory)
+   END
+END SilentScatterTreasures ;
+
+
+PROCEDURE ScatterTreasures (p, r: CARDINAL) ;
+BEGIN
+   SilentScatterTreasures (p, r) ;
+   WITH Player[p] DO
+      GetAccessToScreenNo (p) ;
+      WriteWeight (p, Entity.Weight) ;
+      ReleaseAccessToScreenNo (p)
    END
 END ScatterTreasures ;
 
@@ -623,7 +641,7 @@ VAR
    ok     : BOOLEAN ;
 BEGIN
    WITH Player[p] DO
-      IF TreasNo IN TreasureOwn
+      IF TreasNo IN Entity.TreasureOwn
       THEN
          d := Direction ;
          r := RoomOfMan ;
@@ -693,15 +711,25 @@ END DropTreasure1 ;
 PROCEDURE putDown (p, r, TreasNo, tx, ty: CARDINAL) ;
 BEGIN
    WITH Player[p] DO
-      DEC (Weight, Treasure[TreasNo].Tweight) ;
+      DEC (Entity.Weight, Treasure[TreasNo].Tweight) ;
       Treasure[TreasNo].Rm := r ;    (* Put in this Room *)
       Treasure[TreasNo].Xpos := tx ;
       Treasure[TreasNo].Ypos := ty ;
       Treasure[TreasNo].kind := onfloor ;
       INCL (Rooms[r].Treasures, TreasNo) ; (* Room has treasure             *)
-      EXCL (TreasureOwn, TreasNo) ;  (* Player no longer has treasure *)
+      EXCL (Entity.TreasureOwn, TreasNo) ;  (* Player no longer has treasure *)
    END
 END putDown ;
+
+
+PROCEDURE dropDown (r, TreasNo, tx, ty: CARDINAL) ;
+BEGIN
+   Treasure[TreasNo].Rm := r ;    (* Put in this Room *)
+   Treasure[TreasNo].Xpos := tx ;
+   Treasure[TreasNo].Ypos := ty ;
+   Treasure[TreasNo].kind := onfloor ;
+   INCL (Rooms[r].Treasures, TreasNo) ; (* Room has treasure             *)
+END dropDown ;
 
 
 (*
@@ -711,10 +739,10 @@ END putDown ;
 PROCEDURE pickUp (p, r, TreasNo: CARDINAL) ;
 BEGIN
    WITH Player[p] DO
-      INC (Weight, Treasure[TreasNo].Tweight) ;
+      INC (Entity.Weight, Treasure[TreasNo].Tweight) ;
       Treasure[TreasNo].Rm := 0 ; (* No longer in a Room *)
       Treasure[TreasNo].kind := onperson ; (* No longer in a Room *)
-      INCL (TreasureOwn, TreasNo)
+      INCL (Entity.TreasureOwn, TreasNo)
    END
 END pickUp ;
 
@@ -731,19 +759,19 @@ BEGIN
       THEN
          IF r=SackOfCoal[TreasNo-SackOfCoal1]
          THEN
-            GetAccessToScreenNo(p) ;
-            WriteWeight(p, Weight) ;
-            WriteCommentLine3(p, 'dropped') ;
-            ReleaseAccessToScreenNo(p) ;
+            GetAccessToScreenNo (p) ;
+            WriteWeight (p, Entity.Weight) ;
+            WriteCommentLine3 (p, 'dropped') ;
+            ReleaseAccessToScreenNo (p) ;
             putDown (p, r, TreasNo, tx, ty) ;
-            DrawTreasure(r, tx, ty)
+            DrawTreasure (r, tx, ty)
          ELSE
-            StrCopy('to room ', a) ;
-            CardToStr(SackOfCoal[TreasNo-SackOfCoal1], 4, b) ;
-            StrConCat(a, b, a) ;
-            GetAccessToScreenNo(p) ;
-            WriteCommentLine3(p, a) ;
-            ReleaseAccessToScreenNo(p)
+            StrCopy ('to room ', a) ;
+            CardToStr (SackOfCoal[TreasNo-SackOfCoal1], 4, b) ;
+            StrConCat (a, b, a) ;
+            GetAccessToScreenNo (p) ;
+            WriteCommentLine3 (p, a) ;
+            ReleaseAccessToScreenNo (p)
          END
       ELSE
          IF TreasNo=SpeedPotion
@@ -751,11 +779,11 @@ BEGIN
             (* PutPriority(CurrentProcess, User, 3) *)
          END ;
          putDown (p, r, TreasNo, tx, ty) ;
-         GetAccessToScreenNo(p) ;
-         WriteCommentLine3(p, 'dropped') ;
-         WriteWeight(p, Weight) ;
-         ReleaseAccessToScreenNo(p) ;
-         DrawTreasure(r, tx, ty)
+         GetAccessToScreenNo (p) ;
+         WriteCommentLine3 (p, 'dropped') ;
+         WriteWeight (p, Entity.Weight) ;
+         ReleaseAccessToScreenNo (p) ;
+         DrawTreasure (r, tx, ty)
       END
    END
 END PutDownTreasure ;
@@ -803,7 +831,7 @@ BEGIN
             DelCommentLine2(p) ;
             DelCommentLine3(p) ;
             ReleaseAccessToScreenNo(p)
-         ELSIF TreasNo IN TreasureOwn
+         ELSIF TreasNo IN Entity.TreasureOwn
          THEN
             ReleaseReadAccessToPlayer ;
             IF TreasNo>9
@@ -829,7 +857,6 @@ BEGIN
             GlobalPositionSystem:  DisplayPos
 
             ELSE
-               ReleaseReadAccessToPlayer ;
                GetAccessToScreenNo(p) ;
                WriteCommentLine1(p, 'no effect') ;
                DelCommentLine2(p) ;
@@ -847,6 +874,50 @@ BEGIN
       END
    END
 END UseTreasure ;
+
+
+PROCEDURE HideDoor ;
+VAR
+   Success: BOOLEAN ;
+   p,
+   roomno,
+   x, y,
+   dir    : CARDINAL ;
+BEGIN
+   p := PlayerNo () ;
+   GetReadAccessToPlayer ;
+   GetWriteAccessToDoor ;
+   Success := ClosedToTimedDoor () ;
+   GetAccessToScreen ;
+   IF Success
+   THEN
+      DelCommentLine1 (p) ;
+      WITH Player[p] DO
+         roomno := RoomOfMan ;
+         x := Xman ;
+         y := Yman ;
+         dir := Direction ;
+      END
+   ELSE
+      WriteCommentLine1 (p, 'thou canst')
+   END ;
+   ReleaseAccessToScreen ;
+   ReleaseWriteAccessToDoor ;
+   ReleaseReadAccessToPlayer ;
+   IF Success
+   THEN
+      unhideDoorFuture (TicksPerSecond * 20, roomno, x, y, dir) ;
+      GetWriteAccessToTreasure ;
+      randomPlace (roomno, MagicKey, onfloor) ;
+      ReleaseWriteAccessToTreasure ;
+      GetWriteAccessToPlayer ;
+      EXCL (Player[p].Entity.TreasureOwn, MagicKey) ;
+      ReleaseWriteAccessToPlayer ;
+      GetAccessToScreen ;
+      WriteWeight (p, Player[p].Entity.Weight) ;
+      ReleaseAccessToScreen ;
+   END
+END HideDoor ;
 
 
 PROCEDURE UseCrystalBall ;
@@ -1097,11 +1168,11 @@ END DisplayEnemy ;
 
 
 PROCEDURE DisplayEn (p, e: CARDINAL) ;
+(* ******************
 VAR
    OldMan: Man ;
    ch    : CHAR ;
 BEGIN
-(* ******************
    (* Save player p man first *)
    GetWriteAccessToAllPlayers ;
    OldMan := Player[p] ;
@@ -1148,7 +1219,7 @@ PROCEDURE DisplayTreasures ;
 VAR
    p, tp,
    i, j : CARDINAL ;
-   ok   : BOOLEAN ;
+   found: BOOLEAN ;
    ch   : CHAR ;
    no   : ARRAY [0..3] OF CHAR ;
    line : ARRAY [0..80] OF CHAR ;
@@ -1159,23 +1230,23 @@ BEGIN
    GetAccessToScreenNo(p) ;
    ClearScreen(p) ;
    FOR i := 1 TO MaxNoOfTreasures DO
-      ok := FALSE ;
+      found := FALSE ;
       FOR tp := 0 TO MaxNoOfPlayers DO
          IF IsPlayerActive(tp)
          THEN
             WITH Player[tp] DO
-               IF i IN TreasureOwn
+               IF i IN Entity.TreasureOwn
                THEN
-                  StrCopy(ManName, line) ;
-                  StrConCat(line, ' ', line) ;
-                  ok := TRUE
+                  StrCopy (Entity.Name, line) ;
+                  StrConCat (line, ' ', line) ;
+                  found := TRUE
                END
             END
          END
       END ;
       IF (Treasure[i].Rm # 0) AND (Treasure[i].kind = onfloor)
       THEN
-         IF (NOT ok)
+         IF NOT found
          THEN
             CardToStr(Treasure[i].Rm, 6, line) ;
             StrConCat(' ', line, line) ;
@@ -1254,14 +1325,14 @@ BEGIN
                IF IsPlayerActive(i)
                THEN
                   WITH Player[i] DO
-                     IF HandGrenade IN TreasureOwn
+                     IF HandGrenade IN Entity.TreasureOwn
                      THEN
                         RoomOfExplosion := RoomOfMan ;
-                        DEC(Weight, Tweight) ;
-                        EXCL(TreasureOwn, HandGrenade) ;
-                        GetAccessToScreenNo(i) ;
-                        WriteWeight(i, Weight) ;
-                        ReleaseAccessToScreenNo(i)
+                        DEC (Entity.Weight, Tweight) ;
+                        EXCL (Entity.TreasureOwn, HandGrenade) ;
+                        GetAccessToScreenNo (i) ;
+                        WriteWeight (i, Entity.Weight) ;
+                        ReleaseAccessToScreenNo (i)
                      END
                   END
                END ;
@@ -1269,8 +1340,8 @@ BEGIN
             UNTIL (RoomOfExplosion#0) OR (i=NextFreePlayer)
          ELSE
             RoomOfExplosion := Rm ;
-            EXCL(Rooms[Rm].Treasures, HandGrenade) ;
-            EraseTreasure(Rm, Xpos, Ypos)
+            EXCL (Rooms[Rm].Treasures, HandGrenade) ;
+            EraseTreasure (Rm, Xpos, Ypos)
          END
       END ;
 
@@ -1284,21 +1355,21 @@ BEGIN
                   IF RoomOfExplosion=RoomOfMan
                   THEN
                      hit := TRUE ;
-                     GetAccessToScreenNo(i) ;
-                     UpDateWoundsAndFatigue(i) ;
-                     WriteCommentLine1(i, 'boooommm') ;
-                     DelCommentLine2(i) ;
-                     DelCommentLine3(i) ;
-                     IF Wounds>DammageByHandGrenade
+                     GetAccessToScreenNo (i) ;
+                     UpDateWoundsAndFatigue (i) ;
+                     WriteCommentLine1 (i, 'boooommm') ;
+                     DelCommentLine2 (i) ;
+                     DelCommentLine3 (i) ;
+                     IF Entity.Wounds > GetDamageHandGrenadePlayer (i)
                      THEN
-                        DEC(Wounds, DammageByHandGrenade) ;
+                        DEC (Entity.Wounds, GetDamageHandGrenadePlayer (i))
                      ELSE
-                        INCL(SlainP, i) ;
-                        Wounds := 0 ;
-                        DeathType := explosion
+                        INCL (SlainP, i) ;
+                        Entity.Wounds := 0 ;
+                        Entity.DeathType := explosion
                      END ;
-                     WriteWounds(i, Wounds) ;
-                     ReleaseAccessToScreenNo(i)
+                     WriteWounds (i, Entity.Wounds) ;
+                     ReleaseAccessToScreenNo (i)
                   END
                END
             END
@@ -1308,11 +1379,11 @@ BEGIN
       ReleaseWriteAccessToPlayer ;
       IF RoomOfExplosion # 0
       THEN
-         Explode(RoomOfExplosion, pulled, hit) ;
+         Explode (RoomOfExplosion, pulled, hit) ;
          FOR i := 0 TO MaxNoOfPlayers DO
             IF i IN SlainP
             THEN
-               Dead(i, RoomOfExplosion)
+               Dead (i, RoomOfExplosion)
             END
          END
       END ;
@@ -1345,19 +1416,50 @@ VAR
 BEGIN
    IF freeDesc = NIL
    THEN
-      NEW (d)
+      RETURN NIL
    ELSE
       d := freeDesc ;
-      freeDesc := freeDesc^.right
-   END ;
-   d^.Rm := Rm ;
-   d^.tno := tno ;
-   d^.kind := kind ;
-   d^.amount := amount ;
-   d^.ticks := ticks ;
-   d^.right := NIL ;
-   RETURN d
+      freeDesc := freeDesc^.right ;
+      d^.kind := kind ;
+      d^.x := 0 ;
+      d^.y := 0 ;
+      d^.dir := 0 ;
+      d^.Rm := Rm ;
+      d^.tno := tno ;
+      d^.amount := amount ;
+      d^.ticks := ticks ;
+      d^.right := NIL ;
+      RETURN d
+   END
 END newQDesc ;
+
+
+(*
+   newTimedDoorQDesc -
+*)
+
+PROCEDURE newTimedDoorQDesc (ticks: CARDINAL; roomno, x, y, dir: CARDINAL) : QDesc ;
+VAR
+   d: QDesc ;
+BEGIN
+   IF freeDesc = NIL
+   THEN
+      RETURN NIL
+   ELSE
+      d := freeDesc ;
+      freeDesc := freeDesc^.right ;
+      d^.kind := timeddoor ;
+      d^.x := x ;
+      d^.y := y ;
+      d^.dir := dir ;
+      d^.Rm := roomno ;
+      d^.tno := 0 ;
+      d^.amount := 0 ;
+      d^.ticks := ticks ;
+      d^.right := NIL ;
+      RETURN d
+   END
+END newTimedDoorQDesc ;
 
 
 (*
@@ -1381,7 +1483,8 @@ END freeQ ;
 
 PROCEDURE respawnThread ;
 VAR
-   desc: QDesc ;
+   desc   : QDesc ;
+   success: BOOLEAN ;
 BEGIN
    LOOP
       printf ("respawnThread\n");
@@ -1396,7 +1499,14 @@ BEGIN
       IF qHead # NIL
       THEN
          WITH qHead^ DO
-            IF tno < LowFreePool
+            IF qHead^.kind = timeddoor
+            THEN
+               GetWriteAccessToDoor ;
+               WITH qHead^ DO
+                  success := TimedDoorToSecret (Rm, x, y, dir)
+               END ;
+               ReleaseWriteAccessToDoor
+            ELSIF tno < LowFreePool
             THEN
                RespawnTreasure (Rm, tno, 0)
             ELSE
@@ -1471,16 +1581,43 @@ END relativeAdd ;
 
 
 (*
-   addToQueue -
+   unhideDoorFuture -
 *)
 
-PROCEDURE addToQueue (seedRoom: CARDINAL; tno: CARDINAL; kind: TreasureKind;
-                      amount: CARDINAL; ticks: CARDINAL) ;
+PROCEDURE unhideDoorFuture (ticks: CARDINAL; roomno, x, y, dir: CARDINAL) ;
+VAR
+   desc: QDesc ;
+BEGIN
+   Wait (qMutex) ;
+   desc := newTimedDoorQDesc (ticks, roomno, x, y, dir) ;
+   Signal (qMutex) ;
+   addToQueue (desc)
+END unhideDoorFuture ;
+
+
+(*
+   spawnFuture -
+*)
+
+PROCEDURE spawnFuture (seedRoom: CARDINAL; tno: CARDINAL; kind: TreasureKind;
+                       amount: CARDINAL; ticks: CARDINAL) ;
 VAR
    desc: QDesc ;
 BEGIN
    Wait (qMutex) ;
    desc := newQDesc (seedRoom, tno, kind, amount, ticks) ;
+   Signal (qMutex) ;
+   addToQueue (desc)
+END spawnFuture ;
+
+
+(*
+   addToQueue -
+*)
+
+PROCEDURE addToQueue (desc: QDesc) ;
+BEGIN
+   Wait (qMutex) ;
    relativeAdd (desc) ;
    IF armedTimer = NIL
    THEN
@@ -1508,7 +1645,7 @@ BEGIN
    THEN
       randomPlace (seedRoom, tno, onfloor)
    ELSE
-      addToQueue (seedRoom, tno, onfloor, 0, ticks)
+      spawnFuture (seedRoom, tno, onfloor, 0, ticks)
    END
 END RespawnTreasure ;
 
@@ -1575,7 +1712,7 @@ PROCEDURE RespawnArrow (seedRoom: CARDINAL; tno: CARDINAL;
                         spawnKind, arrowKind: TreasureKind;
                         amount: CARDINAL; ticks: CARDINAL) ;
 BEGIN
-   IF amount > 0
+   IF EnableRespawn AND (amount > 0)
    THEN
       IF tno = 0
       THEN
@@ -1589,7 +1726,7 @@ BEGIN
          THEN
             randomPlace (seedRoom, tno, arrowKind)
          ELSE
-            addToQueue (seedRoom, tno, arrowKind, amount, ticks)
+            spawnFuture (seedRoom, tno, arrowKind, amount, ticks)
          END
       END
    END
@@ -1624,6 +1761,26 @@ BEGIN
    Treasure[i].Tweight := weight ;
    Treasure[i].kind := kind ;
 END initTreasure ;
+
+
+(*
+   preallocDesc -
+*)
+
+PROCEDURE preallocDesc ;
+VAR
+   q: QDesc ;
+   i: CARDINAL ;
+BEGIN
+   FOR i := 1 TO MaxPreallocDesc DO
+      NEW (q) ;
+      IF q # NIL
+      THEN
+         q^.right := freeDesc ;
+         freeDesc := q
+      END
+   END
+END preallocDesc ;
 
 
 PROCEDURE Init ;
@@ -1681,6 +1838,7 @@ BEGIN
    qAvailable := InitSemaphore (0, "qAvailable") ;
    qHead := NIL ;
    freeDesc := NIL ;
+   preallocDesc ;
    qThread := NIL
 END Init ;
 

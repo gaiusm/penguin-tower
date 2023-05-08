@@ -23,9 +23,9 @@ FROM AdvMath IMPORT UpDateWoundsAndFatigue,
                     StrengthToFireMagic ;
 
 FROM AdvUtil IMPORT MoveMan, Exit, InitialDisplay,
-                    OpenDoor, CloseDoor, ExamineDoor, HideDoor,
+                    OpenDoor, CloseDoor, ExamineDoor,
                     Attack, Thrust, Parry,
-                    Speak ;
+                    Speak, Alive ;
 
 FROM Screen IMPORT Height, Width, WriteTime, ClearScreen, Pause,
                    WriteString,
@@ -35,8 +35,36 @@ FROM Screen IMPORT Height, Width, WriteTime, ClearScreen, Pause,
 
 
 CONST
-   MaxCard = 65535 ;
    CtrlL   =    ff ;
+
+
+(*
+   CheckTilde - we check for ~ ! to toggle the anim.
+*)
+
+PROCEDURE CheckTilde (ch: CHAR) ;
+VAR
+   p: CARDINAL ;
+BEGIN
+   p := PlayerNo() ;
+   WITH Player[p] DO
+      IF tilde AND (ch = '!')
+      THEN
+         anim := NOT anim ;
+         tilde := FALSE ;
+
+      ELSIF ch = '~'
+      THEN
+         tilde := TRUE
+      ELSIF ch = '#'
+      THEN
+         (* (internal) Shell *)
+         tilde := FALSE
+      ELSE
+         tilde := FALSE
+      END
+   END
+END CheckTilde ;
 
 
 (* Adventure Commands! - Interpreted *)
@@ -49,14 +77,8 @@ BEGIN
    p := PlayerNo() ;
    WITH Player[p] DO
       GetWriteAccessToPlayer ;
-      Dead := DeathType#living ;
-      IF Dead
+      IF Alive ()
       THEN
-         RoomOfMan := 0 ;
-         Xman := MaxCard-Width ;
-         Yman := MaxCard-Height ;
-         ReleaseWriteAccessToPlayer
-      ELSE
          WriteTime (p) ;  (* always start by displaying the current time.  *)
 
          ReleaseWriteAccessToPlayer ;
@@ -64,45 +86,42 @@ BEGIN
          UpDateWoundsAndFatigue(p) ;
          ReleaseAccessToScreenNo(p) ;
 
+         CheckTilde (ch) ;
          CASE ch OF
 
-         'h'  : Help |
-         'i'  : Inventory |
-         'v'  : ValtTurn |
-         'r'  : RightTurn |
-         'l'  : LeftTurn |
-         '0'..'9' : MoveMan( ORD(ch)-ORD('0') ) |
-         'f'  : FireNormalArrow |
-         'm'  : FireMagicArrow |
-         'p'  : Parry |
-         't'  : Thrust |
-         'a'  : Attack |
-         'o'  : OpenDoor |
-         'c'  : CloseDoor |
-         'e'  : ExamineDoor |
-         'g'  : GetTreasure |
-         'd'  : DropTreasure |
-         'u'  : UseTreasure |
-         's'  : Speak |
-         'w'  : |
+         'h'      : Help |
+         'i'      : Inventory |
+         'v'      : ValtTurn |
+         'r'      : RightTurn |
+         'l'      : LeftTurn |
+         '0'..'9' : MoveMan (ORD (ch)-ORD ('0')) |
+         'f'      : FireNormalArrow |
+         'm'      : FireMagicArrow |
+         'p'      : Parry |
+         't'      : Thrust |
+         'a'      : Attack |
+         'o'      : OpenDoor |
+         'c'      : CloseDoor |
+         'e'      : ExamineDoor |
+         'g'      : GetTreasure |
+         'd'      : DropTreasure |
+         'u'      : UseTreasure |
+         's'      : Speak |
+         'w'      : |
 
-         CtrlL: RedrawScreen |
+         CtrlL    : RedrawScreen |
 
-         esc  : Exit ;
-                DeathType := exitdungeon
+         esc      : Exit ;
+                    Entity.DeathType := exitdungeon
 
          ELSE
          END ;
          GetWriteAccessToPlayer ;
-         Dead := DeathType#living ;
-         IF Dead
+         IF Alive ()
          THEN
-            Xman := MaxCard-Width ;
-            Yman := MaxCard-Height ;
-            RoomOfMan := 0
-         END ;
-         ReleaseWriteAccessToPlayer
-      END
+         END
+      END ;
+      ReleaseWriteAccessToPlayer
    END
 END ExecuteCommand ;
 
@@ -131,6 +150,8 @@ BEGIN
    WriteString(p, "'g'        get treasure in front of you") ;
    WriteString(p, "'d' <no>   drop treasure in front of you") ;
    WriteString(p, "'u' <no>   use treasure") ;
+   WriteString(p, "'F11       toggle full screen") ;
+   WriteString(p, "'F12       toggle animation mode") ;
    ReleaseAccessToScreenNo(p) ;
    Pause(p) ;
    RedrawScreen
@@ -211,13 +232,11 @@ VAR
    r,
    x, y, p,
    Dir    : CARDINAL ;
-   yes    : BOOLEAN ;
 BEGIN
    p := PlayerNo() ;
    WITH Player[p] DO
       GetWriteAccessToPlayer ;
-      StrengthToFireMagic(yes) ;
-      IF yes
+      IF StrengthToFireMagic ()
       THEN
          IF NoOfMagic>0
          THEN
@@ -251,13 +270,11 @@ VAR
    r,
    x, y, p,
    Dir    : CARDINAL ;
-   yes    : BOOLEAN ;
 BEGIN
    p := PlayerNo() ;
    WITH Player[p] DO
       GetWriteAccessToPlayer ;
-      StrengthToFireArrow(yes) ;
-      IF yes
+      IF StrengthToFireArrow ()
       THEN
          IF NoOfNormal>0
          THEN

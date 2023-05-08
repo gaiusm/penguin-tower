@@ -1,15 +1,6 @@
 DEFINITION MODULE Screen ;
 
 FROM DynamicStrings IMPORT String ;
-EXPORT QUALIFIED ClearScreen, WriteString, PromptString,
-                 InitScreen, WriteName, WriteFloor, WriteRoom,
-                 WriteWounds, WriteFatigue, WriteMagicArrows,
-                 WriteArrows, WriteTime, WriteCommand, WriteWeight,
-                 WriteCommentLine1, WriteCommentLine2, WriteCommentLine3,
-                 DelCommentLine1, DelCommentLine2, DelCommentLine3,
-                 Pause, AssignMapName, Quit, Flush,
-                 Width, Height,
-                 InnerX, OuterX, InnerY, OuterY, OffX, OffY ;
 
 
 CONST
@@ -28,6 +19,7 @@ CONST
 PROCEDURE ClearScreen (p: CARDINAL) ;
 PROCEDURE WriteString (p: CARDINAL; a: ARRAY OF CHAR) ;
 PROCEDURE PromptString (p: CARDINAL; a: ARRAY OF CHAR) ;
+PROCEDURE EnterCombat (p: CARDINAL) ;
 
 PROCEDURE InitScreen (p: CARDINAL) ;
 PROCEDURE WriteName (p: CARDINAL; a: ARRAY OF CHAR) ;

@@ -10,6 +10,8 @@ IMPORT DrawL ;
 FROM Screen IMPORT Height, Width, Flush,
                    WriteCommentLine1, WriteCommentLine2, WriteCommentLine3 ;
 
+FROM AdvMap IMPORT IncPosition ;
+
 FROM AdvSystem IMPORT Player, PlayerNo, PlayerSet,
                       NextFreePlayer,
                       IsPlayerActive,
@@ -104,6 +106,99 @@ BEGIN
       END
    END
 END EraseMan ;
+
+
+(* AnimEraseMan erases the calling player on every screen     *)
+(* that is currently displaying this player.                  *)
+
+PROCEDURE AnimEraseMan (p: CARDINAL) ;
+VAR
+   i, r, x, y, Sx, Sy: CARDINAL ;
+BEGIN
+   WITH Player[p] DO
+      r := RoomOfMan ;
+      x := Xman ;
+      y := Yman
+   END ;
+
+   FOR i := 0 TO NextFreePlayer-1 DO
+      IF IsPlayerActive (i) AND IsVisible (i, r, x, y)
+      THEN
+         WITH Player[i] DO
+            Sx := ScreenX ;
+            Sy := ScreenY
+         END ;
+         GetAccessToScreenNo (i) ;
+         DrawL.AnimEraseMan (i#p, x-Sx, y-Sy) ;
+         Flush (i) ;
+         ReleaseAccessToScreenNo (i)
+      END
+   END
+END AnimEraseMan ;
+
+
+(*
+   IsVisible - return TRUE if position x, y is visible for player p.
+*)
+
+PROCEDURE IsVisible (p, r, x, y: CARDINAL) : BOOLEAN ;
+VAR
+   Sx, Sy: CARDINAL ;
+BEGIN
+   WITH Player[p] DO
+      IF r = RoomOfMan
+      THEN
+         Sx := ScreenX ;
+         Sy := ScreenY ;
+         IF (x>=Sx) AND (x<=Sx+Width) AND
+            (y>=Sy) AND (y<=Sy+Height)
+         THEN
+            RETURN TRUE
+         END
+      END
+   END ;
+   RETURN FALSE
+END IsVisible ;
+
+
+PROCEDURE AnimMoveMan (p, s, n, dir: CARDINAL) ;
+VAR
+   Sx, Sy,
+   pn, i, j,
+   x, y, r : CARDINAL ;
+BEGIN
+   WITH Player[p] DO
+      r := RoomOfMan ;
+      x := Xman ;
+      y := Yman ;
+      dir := Direction
+   END ;
+
+   FOR pn := 0 TO NextFreePlayer-1 DO
+      IF IsPlayerActive (pn)
+      THEN
+         IF IsVisible (pn, r, x, y)
+         THEN
+            WITH Player[pn] DO
+               Sx := ScreenX ;
+               Sy := ScreenY
+            END ;
+            i := x ;
+            j := y ;
+            IncPosition (i, j, dir) ;
+            GetAccessToScreenNo (pn) ;
+            IF IsVisible (pn, r, i, j)
+            THEN
+               DrawL.AnimMoveMan (p#pn, x-Sx, y-Sy, i, j, dir, s, n)
+            ELSE
+               DrawL.AnimEraseMan (p#pn, x-Sx, y-Sy) ;
+               Flush (pn)
+            END ;
+            ReleaseAccessToScreenNo (pn)
+         END
+      END
+   END
+END AnimMoveMan ;
 
 
 (* DrawDoor draws a door on every screen possible ie all that *)

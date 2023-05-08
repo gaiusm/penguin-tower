@@ -1,17 +1,6 @@
 DEFINITION MODULE AdvUtil ;
 
 
-EXPORT QUALIFIED InitialDisplay, TestIfLastLivePlayer,
-                 GetDoorOnPoint, PointOnWall, PointOnTreasure,
-                 Positioning, RandomRoom, PositionInRoom,
-                 FreeOfPlayersAndTreasure,
-                 MoveMan, Dead, Exit,
-                 OpenDoor, CloseDoor, ExamineDoor, HideDoor,
-                 MagicArrow, NormalArrow, HideTreasure,
-                 Parry, Thrust, Attack,
-                 Speak ;
-
-
 PROCEDURE InitialDisplay ;
 PROCEDURE Positioning ;
 PROCEDURE Dead (p, room: CARDINAL) ;
@@ -46,12 +35,14 @@ PROCEDURE NormalArrow (p: CARDINAL) ;
 PROCEDURE OpenDoor ;
 PROCEDURE CloseDoor ;
 PROCEDURE ExamineDoor ;
-PROCEDURE HideDoor ;
 PROCEDURE Parry ;
 PROCEDURE Attack ;
 PROCEDURE Thrust ;
 PROCEDURE Speak ;
 PROCEDURE Exit ;
+PROCEDURE Alive () : BOOLEAN ;
+PROCEDURE TimedDoorToSecret (roomno, x, y, dir: CARDINAL) : BOOLEAN ;
+PROCEDURE ClosedToTimedDoor () : BOOLEAN ;
 
 
 END AdvUtil.

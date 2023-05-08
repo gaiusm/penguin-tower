@@ -1,82 +1,8 @@
 DEFINITION MODULE AdvMath ;
 
-EXPORT QUALIFIED RequiredToParry,
-                 RequiredToAttack,
-                 RequiredToThrust,
-                 RequiredToFireArrow,
-                 RequiredToFireMagic,
-                 RequiredToMove,
-                 RequiredToMagicShoes,
-                 RequiredToMagicParry,
-                 RequiredToMagicAttack,
-                 RequiredToMagicThrust,
-
-                 DammageByParry,
-                 DammageByAttack,
-                 DammageByThrust,
-                 DammageByFireArrow,
-                 DammageByFireMagic,
-                 DammageByHandGrenade,
-                 DammageByHotIron,
-                 DammageByMagicParry,
-                 DammageByMagicAttack,
-                 DammageByMagicThrust,
-
-                 MagicKey,
-                 CrystalBall,
-                 MagicSpring,
-                 SackOfCoal1,
-                 SackOfCoal2,
-                 HotIron,
-                 HandGrenade,
-                 MagicSword,
-                 MagicShoes,
-                 SleepPotion,
-                 LumpOfIron,
-                 TreasTrove,
-                 SpeedPotion,
-                 MagicShield,
-                 VisionChest,
-                 QuiverNormal,
-                 QuiverMagic,
-                 HealingPotion,
-                 GlobalPositionSystem,
-                 LowFreePool,
-                 HighFreePool,
-                 MaxNoOfTreasures,
-
-                 UpDateWoundsAndFatigue,
-                 StrengthToParry,
-                 StrengthToAttack,
-                 StrengthToThrust,
-                 StrengthToFireArrow,
-                 StrengthToFireMagic,
-                 StrengthToMove ;
-
+FROM AdvSystem IMPORT TypeOfEntity ;
 
 CONST
-   RequiredToParry       =   3 ;
-   RequiredToAttack      =   5 ;
-   RequiredToThrust      =   9 ;
-   RequiredToFireArrow   =  10 ;
-   RequiredToFireMagic   =  15 ;
-   RequiredToMove        =   6 ;  (* For 9 squares *)
-   RequiredToMagicShoes  =   3 ;  (* For 9 squares *)
-   RequiredToMagicParry  =   1 ;
-   RequiredToMagicAttack =   3 ;
-   RequiredToMagicThrust =   6 ;
-
-   DammageByParry        =   7 ;
-   DammageByAttack       =  13 ;
-   DammageByThrust       =  17 ;
-   DammageByFireArrow    =  23 ;
-   DammageByFireMagic    =  74 ;
-   DammageByHandGrenade  =  69 ;
-   DammageByHotIron      =  19 ;
-   DammageByMagicParry   =   8 ;
-   DammageByMagicAttack  =  14 ;
-   DammageByMagicThrust  =  18 ;
-
    MagicKey              =   1 ;  (* Treasure Numbers *)
    CrystalBall           =   2 ;
    MagicSpring           =   3 ;
@@ -99,24 +25,55 @@ CONST
 
    MaxNoOfTreasures      =  31 ;  (* An upper limit *)
    HighFreePool          = MaxNoOfTreasures ;
-   LowFreePool           =  20 ;  (* start of dynamic treasures. (see AdvMath.def for static list).  *)
+   LowFreePool           =  20 ;  (* Start of dynamic treasures. (see AdvMath.def for static list).  *)
+   MaxCard               = 65535 ;  (* Max size of the map.  *)
 
 TYPE
-   FreePool     = [LowFreePool..HighFreePool] ;
+   FreePool         = [LowFreePool..HighFreePool] ;
+   getQueryCardinal = PROCEDURE () : CARDINAL ;
+   isQueryBoolean   = PROCEDURE () : BOOLEAN ;
+
 
 PROCEDURE UpDateWoundsAndFatigue (p: CARDINAL) ;
 
-PROCEDURE StrengthToParry (VAR ok: BOOLEAN) ;
+PROCEDURE GetDamageByParry () : CARDINAL ;
 
-PROCEDURE StrengthToAttack (VAR ok: BOOLEAN) ;
+PROCEDURE GetDamageByAttack () : CARDINAL ;
 
-PROCEDURE StrengthToThrust (VAR ok: BOOLEAN) ;
+PROCEDURE GetDamageByThrust () : CARDINAL ;
 
-PROCEDURE StrengthToFireArrow (VAR ok: BOOLEAN) ;
+PROCEDURE GetDefaultWeight () : CARDINAL ;
 
-PROCEDURE StrengthToFireMagic (VAR ok: BOOLEAN) ;
+PROCEDURE GetDamageFirePlayer (player: CARDINAL; magic: BOOLEAN) : CARDINAL ;
 
-PROCEDURE StrengthToMove (n: CARDINAL ; VAR ok: BOOLEAN) ;
+PROCEDURE GetRateMove (n: CARDINAL) : CARDINAL ;
+
+PROCEDURE StrengthToParry () : BOOLEAN ;
+
+PROCEDURE StrengthToAttack () : BOOLEAN ;
+
+PROCEDURE StrengthToThrust () : BOOLEAN ;
+
+PROCEDURE StrengthToFireArrow () : BOOLEAN ;
+
+PROCEDURE StrengthToFireMagic () : BOOLEAN ;
+
+PROCEDURE StrengthToMove (n: CARDINAL) : BOOLEAN ;
+
+
+(*
+   GetEntityName - assign Charistic[type].name to typename.
+*)
+
+PROCEDURE GetEntityName (type: TypeOfEntity; VAR typename: ARRAY OF CHAR) ;
+
+PROCEDURE GetEntityWeightDefault (type: TypeOfEntity) : CARDINAL ;
+
+PROCEDURE GetDamageHandGrenade () : CARDINAL ;
+
+PROCEDURE GetDamageHandGrenadePlayer (player: CARDINAL) : CARDINAL ;
+
+PROCEDURE GetDamageHotIron () : CARDINAL ;
 
 
 END AdvMath.

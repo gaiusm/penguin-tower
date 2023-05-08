@@ -1,9 +1,6 @@
 DEFINITION MODULE DrawG ;
 
 FROM AdvSystem IMPORT PlayerSet ;
-EXPORT QUALIFIED DrawMan, EraseMan, DrawDoor, DrawTreasure,
-                 EraseTreasure, DrawArrow, EraseArrow,
-                 DisplayMessage ;
 
 
 (* All these procedures to draw on the screens - are Global *)
@@ -32,5 +29,9 @@ PROCEDURE EraseArrow (x, y: CARDINAL ; playerscreen: PlayerSet; flush: BOOLEAN) 
 
 PROCEDURE DisplayMessage (a1, a2, a3: ARRAY OF CHAR) ;
 
-      
+PROCEDURE AnimEraseMan (p: CARDINAL) ;
+
+PROCEDURE AnimMoveMan (p, s, n, dir: CARDINAL) ;
+
+
 END DrawG.

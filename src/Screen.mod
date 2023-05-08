@@ -23,7 +23,7 @@ VAR
 
 PROCEDURE AssignMapName (s: String) ;
 BEGIN
-   CopyOut(mapname, s)
+   CopyOut (mapname, s)
 END AssignMapName ;
 
 
@@ -34,6 +34,7 @@ BEGIN
    Write(' ') ;
    CASE ch OF
 
+   'i'      : StrIO.WriteString( 'Inventory    ') |
    'l'      : StrIO.WriteString( 'Left         ') |
    'r'      : StrIO.WriteString( 'Right        ') |
    'v'      : StrIO.WriteString( 'Vault Turn   ') |
@@ -51,9 +52,10 @@ BEGIN
    'u'      : StrIO.WriteString( 'Use Treasure ') |
    's'      : StrIO.WriteString( 'Speak        ') |
    'w'      : StrIO.WriteString( 'Watch sayeth ') |
+   'h'      : StrIO.WriteString( 'Help         ') |
    '|'      : StrIO.WriteString( 'Exit Dungeon ')
 
-   ELSE       StrIO.WriteString( 'No Command   ') 
+   ELSE       StrIO.WriteString( 'No Command   ')
    END ;
    StrIO.WriteLn ;
    ReleaseAccessToScreenNo(p)
@@ -61,7 +63,20 @@ END WriteCommand ;
 
 
 (*
-   Sync - 
+   EnterCombat -
+*)
+
+PROCEDURE EnterCombat (p: CARDINAL) ;
+BEGIN
+   AssignOutputTo (p) ;
+   GetAccessToScreenNo (p) ;
+   StrIO.WriteString ('combat') ; StrIO.WriteLn ;
+   ReleaseAccessToScreenNo (p)
+END EnterCombat ;
+
+
+(*
+   Sync -
 *)
 
 PROCEDURE Sync (p: CARDINAL) ;
@@ -72,7 +87,7 @@ END Sync ;
 
 
 (*
-   Flush - 
+   Flush -
 *)
 
 PROCEDURE Flush (p: CARDINAL) ;
@@ -83,7 +98,7 @@ END Flush ;
 
 
 (*
-   ClearScreen - 
+   ClearScreen -
 *)
 
 PROCEDURE ClearScreen (p: CARDINAL) ;
@@ -152,22 +167,22 @@ END WriteFloor ;
 
 PROCEDURE InitScreen (p: CARDINAL) ;
 BEGIN
-   GetAccessToScreenNo(p) ;
-   Sync(p) ;
-   ClearScreen(p) ;
+   GetAccessToScreenNo (p) ;
+   Sync (p) ;
+   ClearScreen (p) ;
 
    WITH Player[p] DO
-      WriteName(p, ManName) ;
-      WriteFloor(p) ;
-      WriteRoom(p, RoomOfMan) ;
-      WriteWounds(p, Wounds) ;
-      WriteFatigue(p, Fatigue) ;
-      WriteMagicArrows(p, NoOfMagic) ;
-      WriteArrows(p, NoOfNormal) ;
-      WriteWeight(p, Weight) ;
-      WriteTime(p)
+      WriteName (p, Entity.Name) ;
+      WriteFloor (p) ;
+      WriteRoom (p, RoomOfMan) ;
+      WriteWounds (p, Entity.Wounds) ;
+      WriteFatigue (p, Entity.Fatigue) ;
+      WriteMagicArrows (p, NoOfMagic) ;
+      WriteArrows (p, NoOfNormal) ;
+      WriteWeight (p, Entity.Weight) ;
+      WriteTime (p)
    END ;
-   ReleaseAccessToScreenNo(p)
+   ReleaseAccessToScreenNo (p)
 END InitScreen ;
 
 

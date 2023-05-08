@@ -9,6 +9,8 @@ FROM Debug IMPORT Halt ;
 FROM TimerHandler IMPORT GetTicks, TicksPerSecond ;
 FROM RTint IMPORT InitInputVector, InitOutputVector ;
 FROM COROUTINES IMPORT PROTECTION ;
+FROM AdvMath IMPORT GetEntityWeightDefault ;
+FROM AdvTreasure IMPORT SilentScatterTreasures ;
 
 FROM Executive IMPORT GetCurrentProcess, DESCRIPTOR, SEMAPHORE,
                       Resume, InitProcess, InitSemaphore, Wait, Signal,
@@ -116,6 +118,10 @@ BEGIN
 END ProcessToPlayer ;
 
 
+PROCEDURE stop ;
+END stop ;
+
+
 (*
    checkStatus -
 *)
@@ -126,13 +132,15 @@ VAR
 BEGIN
    IF r<1
    THEN
-      r := printf("WriteS client has gone away - tidying up\n") ;
+      printf ("WriteS client has gone away - tidying up\n") ;
       p := ProcessToPlayer() ;
+      printf ("  client %d needs tidying up\n", p) ;
+      stop ;
       WITH Player[p] DO
          fd := -1 ;
-         IF DeathType=living
+         IF Entity.DeathType = living
          THEN
-            DeathType := exitdungeon
+            Entity.DeathType := exitdungeon
          END
       END
    END
@@ -143,10 +151,10 @@ PROCEDURE localWrite (fd: INTEGER; ch: CHAR) ;
 VAR
    r: INTEGER ;
 BEGIN
-   IF fd>=0
+   IF fd >= 0
    THEN
-      WaitForIO(InitOutputVector(fd, MAX(PROTECTION))) ;
-      checkStatus(write(fd, ADR(ch), SIZE(ch)))
+      WaitForIO (InitOutputVector (fd, MAX (PROTECTION))) ;
+      checkStatus (write (fd, ADR (ch), SIZE (ch)))
    END
 END localWrite ;
 
@@ -155,9 +163,9 @@ PROCEDURE localWriteS (fd: INTEGER; s: ARRAY OF CHAR) ;
 VAR
    r: INTEGER ;
 BEGIN
-   IF fd>=0
+   IF fd >= 0
    THEN
-      checkStatus(write(fd, ADR(s), StrLen(s)))
+      checkStatus (write (fd, ADR (s), StrLen (s)))
    END
 END localWriteS ;
 
@@ -225,7 +233,7 @@ BEGIN
       ELSE
          RETURN( FALSE )
       END
-   END ;
+   END
 END ClientRead ;
 
 
@@ -245,7 +253,7 @@ BEGIN
          END ;
          localWrite(fd, lf)
       END
-   END ;
+   END
 END WriteChar ;
 
 
@@ -300,8 +308,8 @@ BEGIN
             WITH Player[i] DO
                IF fd=-1
                THEN
-                  Weight := ManWeight ;
-                  TreasureOwn := {} ;
+                  Entity.Weight := GetEntityWeightDefault (human) ;
+                  Entity.TreasureOwn := {} ;
                   RETURN( i )
                END
             END
@@ -310,8 +318,8 @@ BEGIN
       i := NextFreePlayer ;
       INC(NextFreePlayer) ;
       WITH Player[i] DO
-         Weight := ManWeight ;
-         TreasureOwn := {} ;
+         Entity.Weight := GetEntityWeightDefault (human) ;
+         Entity.TreasureOwn := {} ;
          NormalProcArgs := InitArgs() ;
          MagicProcArgs := InitArgs() ;
          NEW(pc) ;
@@ -374,12 +382,11 @@ BEGIN
       WITH Player[i] DO
          fd := f ;
          PlayerProcess := GetCurrentProcess() ;
-         DeathType := living ;
-         Wounds := 100 ;
-         Fatigue := 100 ;
          Direction := 0 ;
-         TimeMinSec(LastSecWounds) ;
-         LastSecFatigue := GetTicks() DIV (TicksPerSecond DIV 2)
+         TimeMinSec (LastSecWounds) ;
+         LastSecFatigue := GetTicks () DIV (TicksPerSecond DIV 2) ;
+         tilde := FALSE ;
+         anim := FALSE
       END
    END
 END StartPlayer ;
@@ -387,11 +394,11 @@ END StartPlayer ;
 
 PROCEDURE Init ;
 BEGIN
-   PlayerLock := InitLock('player lock') ;
-   ScreenQ := InitSemaphore(1, 'ScreenQ') ;
-   DoorLock := InitLock('DoorLock') ;
-   TreasureLock := InitLock('TreasureLock') ;
-   AccessToRandom := InitSemaphore(1, 'AccessToRandom') ;
+   PlayerLock := InitLock ('player lock') ;
+   ScreenQ := InitSemaphore (1, 'ScreenQ') ;
+   DoorLock := InitLock ('DoorLock') ;
+   TreasureLock := InitLock ('TreasureLock') ;
+   AccessToRandom := InitSemaphore (1, 'AccessToRandom') ;
    PArgs := InitArgs() ;
    TimeMinSec (RandomCount) ;
    NextFreePlayer := 0 ;
@@ -401,7 +408,7 @@ END Init ;
 
 PROCEDURE TimeMinSec (VAR MinSec: CARDINAL) ;
 BEGIN
-   MinSec := GetTicks() DIV TicksPerSecond
+   MinSec := GetTicks () DIV TicksPerSecond
 END TimeMinSec ;
 
 
@@ -409,11 +416,11 @@ PROCEDURE RandomNumber (VAR r: CARDINAL; n: CARDINAL) ;
 VAR
    ms: CARDINAL ;
 BEGIN
-   IF n=1
+   IF n = 1
    THEN
       r := 0
    ELSE
-      Wait( AccessToRandom ) ;
+      Wait (AccessToRandom) ;
       r := RandomCount MOD n ;
 
       ms := RandomCount MOD 256 ;
@@ -421,9 +428,9 @@ BEGIN
 
       IF (MAX(CARDINAL)-RandomCount) >= 0ABCDH  (* Add 0ABCDH *)
       THEN
-         INC( RandomCount, 0ABCDH )
+         INC (RandomCount, 0ABCDH)
       ELSE
-         DEC( RandomCount, (MAX(CARDINAL)-0ABCDH) )
+         DEC (RandomCount, (MAX(CARDINAL)-0ABCDH))
       END ;
 
       Signal( AccessToRandom ) ;
@@ -432,6 +439,15 @@ BEGIN
    END
 END RandomNumber ;
 
+
+(*
+   IsDeviceAnim - return TRUE if user has requested the anim device.
+*)
+
+PROCEDURE IsDeviceAnim (p: CARDINAL) : BOOLEAN ;
+BEGIN
+   RETURN Player[p].anim
+END IsDeviceAnim ;
 
 
 (* The rules which govern the allocation of these resourses are *)
@@ -457,25 +473,25 @@ END RandomNumber ;
 
 PROCEDURE GetReadAccessToPlayer ;
 BEGIN
-   GetReadAccess(PlayerLock)
+   GetReadAccess (PlayerLock)
 END GetReadAccessToPlayer ;
 
 
 PROCEDURE GetWriteAccessToPlayer ;
 BEGIN
-   GetWriteAccess(PlayerLock)
+   GetWriteAccess (PlayerLock)
 END GetWriteAccessToPlayer ;
 
 
 PROCEDURE ReleaseReadAccessToPlayer ;
 BEGIN
-   ReleaseReadAccess(PlayerLock)
+   ReleaseReadAccess (PlayerLock)
 END ReleaseReadAccessToPlayer ;
 
 
 PROCEDURE ReleaseWriteAccessToPlayer ;
 BEGIN
-   ReleaseWriteAccess(PlayerLock)
+   ReleaseWriteAccess (PlayerLock)
 END ReleaseWriteAccessToPlayer ;
 
 
@@ -485,25 +501,25 @@ END ReleaseWriteAccessToPlayer ;
 
 PROCEDURE GetReadAccessToDoor ;
 BEGIN
-   GetReadAccess(DoorLock)
+   GetReadAccess (DoorLock)
 END GetReadAccessToDoor ;
 
 
 PROCEDURE GetWriteAccessToDoor ;
 BEGIN
-   GetWriteAccess(DoorLock)
+   GetWriteAccess (DoorLock)
 END GetWriteAccessToDoor ;
 
 
 PROCEDURE ReleaseReadAccessToDoor ;
 BEGIN
-   ReleaseReadAccess(DoorLock)
+   ReleaseReadAccess (DoorLock)
 END ReleaseReadAccessToDoor ;
 
 
 PROCEDURE ReleaseWriteAccessToDoor ;
 BEGIN
-   ReleaseWriteAccess(DoorLock)
+   ReleaseWriteAccess (DoorLock)
 END ReleaseWriteAccessToDoor ;
 
 
@@ -513,25 +529,25 @@ END ReleaseWriteAccessToDoor ;
 
 PROCEDURE GetReadAccessToTreasure ;
 BEGIN
-   GetReadAccess(TreasureLock)
+   GetReadAccess (TreasureLock)
 END GetReadAccessToTreasure ;
 
 
 PROCEDURE GetWriteAccessToTreasure ;
 BEGIN
-   GetWriteAccess(TreasureLock)
+   GetWriteAccess (TreasureLock)
 END GetWriteAccessToTreasure ;
 
 
 PROCEDURE ReleaseReadAccessToTreasure ;
 BEGIN
-   ReleaseReadAccess(TreasureLock)
+   ReleaseReadAccess (TreasureLock)
 END ReleaseReadAccessToTreasure ;
 
 
 PROCEDURE ReleaseWriteAccessToTreasure ;
 BEGIN
-   ReleaseWriteAccess(TreasureLock)
+   ReleaseWriteAccess (TreasureLock)
 END ReleaseWriteAccessToTreasure ;
 
 
@@ -541,34 +557,29 @@ END ReleaseWriteAccessToTreasure ;
 
 PROCEDURE GetAccessToScreen ;
 BEGIN
-   GetAccessToScreenNo(PlayerNo())
+   GetAccessToScreenNo (PlayerNo ())
 END GetAccessToScreen ;
 
 
 PROCEDURE ReleaseAccessToScreen ;
 BEGIN
-   ReleaseAccessToScreenNo(PlayerNo())
+   ReleaseAccessToScreenNo (PlayerNo ())
 END ReleaseAccessToScreen ;
 
 
 PROCEDURE GetAccessToScreenNo (p: CARDINAL) ;
 BEGIN
    AssignOutputTo(p) ;
-   Wait(ScreenQ)
+   Wait (ScreenQ)
 END GetAccessToScreenNo ;
 
 
 PROCEDURE ReleaseAccessToScreenNo (p: CARDINAL) ;
 BEGIN
-   Signal(ScreenQ)
+   Signal (ScreenQ)
 END ReleaseAccessToScreenNo ;
 
 
 BEGIN
    Init
 END AdvSystem.
-(*
- * Local variables:
- *  compile-command: "make"
- * End:
- *)

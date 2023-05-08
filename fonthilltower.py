@@ -62,32 +62,12 @@ def initGraphics():
         images[i] = load_png(i + '.png')
     background = pygame.Surface (screen.get_size())
 
-def addSound(name):
-    global soundDict
-    soundDict[name] = load_sound(name + ".wav")
-
-def initSounds():
-    #Load music
-    addSound("arrowswish")
-    addSound("brokenglass")
-    addSound("fuse")
-    addSound("evillaugh")
-    addSound("ohno")
-    addSound("ohnoexplode")
-    addSound("laughexplode")
-    addSound("handgrenade")
-    addSound("magicarrow")
-    addSound("snore")
-    addSound("start")
-    addSound("arrowmiss")
-    addSound("brokenglass")
-    addSound("applause")
-    addSound("exit")
 
 def finishGame():
     # wait 3 seconds before exiting
     pygame.time.delay(3000)
     screen = pygame.display.set_mode((640, 480))
+
 
 def doHorizWall(background, x, y):
     global images
@@ -753,13 +733,6 @@ def askReplayHistory():
        drawComment4(font, background, "goodbye")
        playSound('exit')
 
-def initGameClient():
-    initGraphics()
-    initSounds()
-    initEventLoop()
-    askReplayHistory()
-    finishGame()
-
 
 def handleArgs ():
     global fullscreen, versionNumber, serverName, portNumber, debugging, dataDirectory
@@ -808,6 +781,29 @@ def handle_arguments ():
     args = parser.parse_args ()
     return args
 
+
+def add_sound (name):
+    global sound_dict
+    sound_dict[name] = load_sound (name + ".wav")
+
+
+def init_sounds ():
+    for sound in ["arrowswish", "brokenglass",
+                  "fuse", "evillaugh", "ohno",
+                  "ohnoexplode", "laughexplode",
+                  "handgrenade", "magicarrow",
+                  "snore", "start", "arrowmiss",
+                  "brokenglass", "applause", "exit"]:
+        add_sound (sound)
+
+
+def init_game_client (character):
+    init_sounds ()
+    init_event_loop (character)
+    ask_replay_history ()
+    finish_game ()
+
+
 def load_static_images ():
     global static_images
 
@@ -831,10 +827,125 @@ def init_graphics ():
     background = pygame.Surface (screen.get_size ())
 
 
+def connectServer(id, count):
+    global historyList, sckt, serverName, portNumber, debugging
+
+    # s = open('testscript', 'r')
+    # line = s.readline()
+    while True:
+        sckt = socket(AF_INET, SOCK_STREAM)
+        print(("attempting to connect to %s:%d" % (serverName, portNumber)))
+        try:
+            sckt.connect ((serverName, portNumber))
+            break
+        except error as why:
+            print (("cannot find server on %s:%d" % (serverName, portNumber)))
+            count -= 1
+            if count>0:
+                print("will try again")
+                portNumber += 1
+            else:
+                print (("cannot connect to %s:%d the server is probably not running or it is not accessible" % (serverName, portNumber)))
+                pygame.event.post(pygame.event.Event(USEREVENT, serverLine='abort'))
+                sys.exit(0)
+
+    f = sckt.makefile ("rb")
+    line = stripcrlf(f.readline().decode ('utf-8'))
+    while line:
+        if debugging:
+            print(line)
+        pygame.event.post(pygame.event.Event(USEREVENT, serverLine=line))
+        pygame.time.set_timer(USEREVENT, 0)
+        # pygame.time.delay(200)
+        # line = s.readline()
+        line = stripcrlf(f.readline().decode ('utf-8'))
+    if debugging:
+        print(("line =", line, " thus stopping"))
+    pygame.event.post(pygame.event.Event(USEREVENT, serverLine="quit"))
+    pygame.time.set_timer(USEREVENT, 0)
+
+
+def handle_direction (direction, sckt, newdir):
+    if direction == newdir:
+        sckt.send('1'.encode ('utf-8'))
+        return direction, sckt
+    else:
+        direction = (direction + 4 - newdir) % 4
+        if direction == 2:
+            sckt.send('v'.encode ('utf-8'))
+        elif direction == 1:
+            sckt.send('l'.encode ('utf-8'))
+        else:
+            sckt.send('r'.encode ('utf-8'))
+    return newdir, sckt
+
+
+def update_direction (direction, key):
+    if key == 'r':
+        return (direction + 1) % 4
+    if key == 'l':
+        return (direction + 3) % 4
+    if key == 'v':
+        return (direction + 2) % 4
+    return direction
+
+
+def init_event_loop (character):
+    global sckt, debugging
+
+    in_combat = False
+    _thread.start_new (connectServer, (1, connectAttempts))
+    direction = 0
+    direction_dict = {
+        pygame.K_LEFT: 3,
+        pygame.K_RIGHT: 1,
+        pygame.K_UP: 0,
+        pygame.K_DOWN: 2,
+    }
+    push_back = "\n" + character + "\n"
+    sckt_ready = False
+    while True:
+        for event in pygame.event.get ():
+            if sckt_ready and len (push_back) > 0:
+                sckt.send (push_back[0].encode ('utf-8'))
+                if len (push_back) == 1:
+                    push_back = ""
+                else:
+                    push_back = push_back[1:]
+            if (event.type == KEYDOWN):
+                if in_combat:
+                    if event.key == pygame.K_F11:
+                        pygame.display.toggle_fullscreen ()
+                    elif event.key == pygame.K_F12:
+                        sckt.send ("~!".encode ('utf-8'))
+                    if event.key in direction_dict:
+                        direction, sckt = handle_direction (direction, sckt, direction_dict[event.key])
+                    elif event.key<256:
+                        direction = update_direction (direction, chr(event.key))
+                        sckt.send (chr (event.key).encode ('utf-8'))
+                else:
+                    sckt.send (chr (event.key).encode ('utf-8'))
+                if (event.key == K_ESCAPE):
+                    screen = pygame.display.set_mode((640, 480))
+                    sys.exit(0)
+            elif event.type == USEREVENT:
+                line = event.serverLine
+                if debugging:
+                    print(("about to process", line))
+                in_combat = processLine (line, in_combat)
+                sckt_ready = True
+                if line != 'sync':
+                    historyList.append ([line, pygame.time.get_ticks()])
+                if line == 'quit':
+                    return
+                if line == 'abort':
+                    sys.exit(0)
+
+
 def main():
     handle_arguments ()
     init_graphics ()
-    initGameClient ()
+    init_game_client ("human")
 
 #this calls the 'main' function when this script is executed
 if __name__ == '__main__': main ()

@@ -6,6 +6,7 @@ FROM Window IMPORT Clip, ClipPoint ;
 FROM StrIO IMPORT WriteString, WriteLn ;
 FROM NumberIO IMPORT WriteCard ;
 FROM StdIO IMPORT Write ;
+FROM StrLib IMPORT StrCopy ;
 FROM Debug IMPORT Halt ;
 FROM Assertion IMPORT Assert ;
 
@@ -79,7 +80,7 @@ BEGIN
             x2 := Position.X2 ;
             y2 := Position.Y2 ;
             ds := StateOfDoor ;
-            IF ds#Secret
+            IF (ds # Secret) AND (ds # Timed)
             THEN
                Clip( x1, y1, x2, y2, Sx, Sy, ok ) ;
                IF ok
@@ -273,12 +274,12 @@ BEGIN
             THEN
                x := Xman ;
                y := Yman ;
-               ClipPoint(x, y, Sx, Sy, ok) ;
+               ClipPoint (x, y, Sx, Sy, ok) ;
                IF ok
                THEN
-                  GetAccessToScreenNo(p) ;
-                  Erase(x, y) ;
-                  ReleaseAccessToScreenNo(p)
+                  GetAccessToScreenNo (p) ;
+                  Erase (x, y) ;
+                  ReleaseAccessToScreenNo (p)
                END
             END
          END
@@ -295,6 +296,20 @@ BEGIN
    WriteCard(x2, 0) ; Write(' ') ;
    WriteCard(y2, 0) ; WriteLn
 END StrLine ;
+
+
+PROCEDURE StrMove (direction: ARRAY OF CHAR; command: ARRAY OF CHAR;
+                   x1, y1, x2, y2, stepno, total: CARDINAL) ;
+BEGIN
+   WriteString (direction) ;
+   WriteString (command) ; Write(' ') ;
+   WriteCard (x1, 0) ; Write(' ') ;
+   WriteCard (y1, 0) ; Write(' ') ;
+   WriteCard (x2, 0) ; Write(' ') ;
+   WriteCard (y2, 0) ; Write(' ') ;
+   WriteCard (stepno, 0) ; Write(' ') ;
+   WriteCard (total, 0) ; WriteLn
+END StrMove ;
 
 
 PROCEDURE WLine (x1, y1, x2, y2: CARDINAL) ;
@@ -327,6 +342,7 @@ BEGIN
                  StrLine('hdoor', x1, y1, x2, y2)
               END |
       Open  : StrLine('eL', x1, y1, x2, y2) |
+      Timed,
       Secret: WLine(x1, y1, x2, y2)
 
       END
@@ -343,6 +359,7 @@ BEGIN
                  StrLine('vdoor', x1, y1, x2, y2)
               END |
       Open  : StrLine('eL', x1, y1, x2, y2) |
+      Timed,
       Secret: WLine(x1, y1, x2, y2)
 
       END
@@ -397,6 +414,54 @@ BEGIN
       END
    END
 END DrawMan ;
+
+
+PROCEDURE AnimEraseMan (other: BOOLEAN; x, y: CARDINAL) ;
+BEGIN
+   IF other
+   THEN
+      StrPoint ('animEraseman', x, y)
+   ELSE
+      StrPoint ('animeraseman', x, y)
+   END
+END AnimEraseMan ;
+
+
+PROCEDURE AnimMoveMan (other: BOOLEAN; fromx, fromy, tox, toy, dir, stepno, total: CARDINAL) ;
+VAR
+   command: ARRAY [0..20] OF CHAR ;
+BEGIN
+   IF total <= 1
+   THEN
+      StrCopy ("walk", command)
+   ELSE
+      StrCopy ("run", command)
+   END ;
+   IF other
+   THEN
+      CASE dir OF
+
+      0:  StrMove ('animN', command, fromx, fromy, tox, toy, stepno, total) |
+      1:  StrMove ('animW', command, fromx, fromy, tox, toy, stepno, total) |
+      2:  StrMove ('animS', command, fromx, fromy, tox, toy, stepno, total) |
+      3:  StrMove ('animE', command, fromx, fromy, tox, toy, stepno, total)
+
+      ELSE
+         Halt ('unexpected direction', __FILE__, __FUNCTION__, __LINE__)
+      END
+   ELSE
+      CASE dir OF
+
+      0:  StrMove ('animn', command, fromx, fromy, tox, toy, stepno, total) |
+      1:  StrMove ('animw', command, fromx, fromy, tox, toy, stepno, total) |
+      2:  StrMove ('anims', command, fromx, fromy, tox, toy, stepno, total) |
+      3:  StrMove ('anime', command, fromx, fromy, tox, toy, stepno, total)
+
+      ELSE
+         Halt ('unexpected direction', __FILE__, __FUNCTION__, __LINE__)
+      END
+   END
+END AnimMoveMan ;
 
 
 PROCEDURE DArrow (x, y, dir: CARDINAL) ;

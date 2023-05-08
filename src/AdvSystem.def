@@ -5,48 +5,7 @@ FROM Executive IMPORT SEMAPHORE, DESCRIPTOR ;
 FROM ProcArgs IMPORT ProcessArgs ;
 
 
-EXPORT QUALIFIED ManWeight,
-                 MaxNoOfPlayers,
-                 Man,
-                 TypeOfDeath,
-                 Player,
-                 PlayerSet,
-                 PlayerNo,
-                 ArrowArgs,
-                 StartPlayer,
-                 TimeMinSec,
-                 RandomNumber,
-                 ClientRead,
-                 DefaultWrite,
-                 ReadString,
-                 NextFreePlayer,
-                 IsPlayerActive,
-                 AssignOutputTo,
-                 UnAssign,
-
-                 GetReadAccessToPlayer,
-                 GetWriteAccessToPlayer,
-                 ReleaseReadAccessToPlayer,
-                 ReleaseWriteAccessToPlayer,
-
-                 GetReadAccessToDoor,
-                 GetWriteAccessToDoor,
-                 ReleaseReadAccessToDoor,
-                 ReleaseWriteAccessToDoor,
-
-                 GetReadAccessToTreasure,
-                 GetWriteAccessToTreasure,
-                 ReleaseReadAccessToTreasure,
-                 ReleaseWriteAccessToTreasure,
-
-                 GetAccessToScreen,
-                 ReleaseAccessToScreen,
-                 GetAccessToScreenNo,
-                 ReleaseAccessToScreenNo ;
-
-
 CONST
-   ManWeight      = 70 ;      (* Kgs                               *)
    MaxNoOfPlayers = 100 ;
 
 TYPE
@@ -58,40 +17,51 @@ TYPE
    ArrowArgs = POINTER TO RECORD
                              ArrowPlayer: CARDINAL ;
                              ArrowRoom  : CARDINAL ;
-                             ArrowX     : CARDINAL ;  (* X coord of Arrow   *)
-                             ArrowY     : CARDINAL ;  (* Y coord of Arrow   *)
-                             ArrowDir   : INTEGER ;   (* Direction of Arrow *)
+                             ArrowX     : CARDINAL ;  (* X coord of Arrow    *)
+                             ArrowY     : CARDINAL ;  (* Y coord of Arrow    *)
+                             ArrowDir   : INTEGER ;   (* Direction of Arrow  *)
                              IsMagic    : BOOLEAN ;
                           END ;
 
-   Man = RECORD
-            ManName         : ARRAY [0..9] OF CHAR ;
-            DeathType       : TypeOfDeath ;(* How man died!        *)
-            Weight          : CARDINAL ;   (* Mans Weight in Kgs   *)
-            Wounds          : CARDINAL ;   (* 0..100  0= Dead!     *)
-            Fatigue         : CARDINAL ;   (* 0..100  0= V Tired   *)
-            TreasureOwn     : BITSET ;     (* Treasures that own   *)
-            NoOfMagic       : CARDINAL ;   (* No Of Magic Arrows   *)
-            NoOfNormal      : CARDINAL ;   (* No Of Normal Arrows  *)
-            Xman            : CARDINAL ;   (* X coord of Man       *)
-            Yman            : CARDINAL ;   (* Y coord of Man       *)
-            Direction       : CARDINAL ;   (* Direction of Man 0.4 *)
-            ScreenX         : CARDINAL ;   (* Top Right of screen  *)
-            ScreenY         : CARDINAL ;   (* ditto                *)
-            RoomOfMan       : CARDINAL ;   (* Room Man Current in  *)
-            NormalProcArgs  : ProcessArgs ;
-            MagicProcArgs   : ProcessArgs ;
-            MagicP,
-            NormalP         : DESCRIPTOR ;
-            LastSecWounds   : CARDINAL ;   (* Last updated Wounds  *)
-            LastSecFatigue  : CARDINAL ;   (* Last updated Fatigue *)
-            PlayerProcess   : DESCRIPTOR ; (* process of player    *)
-            fd              : INTEGER ;    (* socket file desc     *)
-         END ;
+   TypeOfEntity = (human, orc, ant, dwarf, elf, salamander, creepingcrud,
+                   fireelemental, troll) ;
+
+   EntityRecord = RECORD
+                     EntityType : TypeOfEntity ;
+                     Leader     : BOOLEAN ;
+                     Name       : ARRAY [0..9] OF CHAR ;
+                     DeathType  : TypeOfDeath ;     (* How entity died!        *)
+                     Weight     : CARDINAL ;        (* Weight in Kgs           *)
+                     Wounds     : CARDINAL ;        (* 0..100  0= Dead!        *)
+                     Fatigue    : CARDINAL ;        (* 0..100  0= V Tired      *)
+                     TreasureOwn: BITSET ;          (* Treasures that own      *)
+                  END ;
+
+   PlayerRecord = RECORD
+                     Entity          : EntityRecord ;
+                     NoOfMagic       : CARDINAL ;   (* No Of Magic Arrows      *)
+                     NoOfNormal      : CARDINAL ;   (* No Of Normal Arrows     *)
+                     Xman            : CARDINAL ;   (* X coord of Man          *)
+                     Yman            : CARDINAL ;   (* Y coord of Man          *)
+                     Direction       : CARDINAL ;   (* Direction of Man 0..4   *)
+                     ScreenX         : CARDINAL ;   (* Top Right of screen     *)
+                     ScreenY         : CARDINAL ;   (* ditto                   *)
+                     RoomOfMan       : CARDINAL ;   (* Room Man Current in     *)
+                     NormalProcArgs  : ProcessArgs ;
+                     MagicProcArgs   : ProcessArgs ;
+                     MagicP,
+                     NormalP         : DESCRIPTOR ;
+                     LastSecWounds   : CARDINAL ;   (* Last updated Wounds     *)
+                     LastSecFatigue  : CARDINAL ;   (* Last updated Fatigue    *)
+                     PlayerProcess   : DESCRIPTOR ; (* process of player       *)
+                     fd              : INTEGER ;    (* socket file desc        *)
+                     tilde           : BOOLEAN ;    (* have we seen ~ pressed? *)
+                     anim            : BOOLEAN ;    (* Are we using anims?     *)
+                  END ;
 
 
 VAR
-   Player        : ARRAY [0..MaxNoOfPlayers] OF Man ;
+   Player        : ARRAY [0..MaxNoOfPlayers] OF PlayerRecord ;
    NextFreePlayer: CARDINAL ;   (* 0..NextFreePlayer-1 are potentially playing *)
 
 
@@ -120,6 +90,13 @@ PROCEDURE UnAssign ;
 *)
 
 PROCEDURE IsPlayerActive (p: CARDINAL) : BOOLEAN ;
+
+
+(*
+   IsDeviceAnim - return TRUE if user has requested the anim device.
+*)
+
+PROCEDURE IsDeviceAnim (p: CARDINAL) : BOOLEAN ;
 
 
 (* PlayerNo - returns the Player number of the current man calling *)

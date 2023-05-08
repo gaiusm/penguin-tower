@@ -1,9 +1,6 @@
 DEFINITION MODULE AdvCmd ;
 
 
-EXPORT QUALIFIED ExecuteCommand ;
-
-
 PROCEDURE ExecuteCommand (ch: CHAR ; VAR Dead: BOOLEAN) ;
 
 

@@ -31,6 +31,8 @@ advflex.c: $(srcdir)/adv.flex
 	flex -t $< > $@
 
 ptower$(EXEEXT): $(DEPS)
+	pwd
+	ls
 	gm2 $(M2FLAGS) -I. -I$(srcdir) $(srcdir)/Dungeon.mod $(DEPS) -o $@
 
 # $(srcdir)/AdvParse.mod: $(srcdir)/AdvParse.bnf

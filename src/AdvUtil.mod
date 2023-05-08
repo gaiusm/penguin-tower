@@ -36,9 +36,14 @@ FROM AdvSystem IMPORT Player, PlayerNo, IsPlayerActive,
                       ReleaseAccessToScreen,
                       GetAccessToScreenNo,
                       ReleaseAccessToScreenNo,
+                      IsDeviceAnim,
                       ClientRead ;
 
-FROM AdvMath IMPORT MaxNoOfTreasures ;
+FROM AdvMath IMPORT MaxNoOfTreasures, MaxCard,
+                    GetDamageByParry, GetDamageByThrust, GetDamageByAttack,
+                    GetDamageFirePlayer,
+                    GetRateMove,
+                    isQueryBoolean, getQueryCardinal ;
 
 FROM AdvMap IMPORT Treasure, Rooms, DoorStatus, TreasureKind,
                    NoOfRoomsToHidePlayers,
@@ -58,18 +63,10 @@ FROM Screen IMPORT InitScreen,
                    InnerX, OuterX, InnerY, OuterY, OffX, OffY,
                    Height, Width ;
 
-FROM AdvMath IMPORT DammageByParry,
-                    DammageByAttack,
-                    DammageByThrust,
-                    DammageByFireArrow,
-                    DammageByFireMagic,
-                    DammageByMagicParry,
-                    DammageByMagicAttack,
-                    DammageByMagicThrust,
-
-                    MagicSword,
+FROM AdvMath IMPORT MagicSword,
                     MagicShield,
 
+                    getQueryCardinal,
                     StrengthToParry,
                     StrengthToAttack,
                     StrengthToThrust,
@@ -81,13 +78,14 @@ FROM AdvMath IMPORT DammageByParry,
 FROM DrawL IMPORT DrawAllPlayers, DrawRoom, ClearRoom ;
 
 FROM DrawG IMPORT DrawMan, EraseMan, DrawDoor, DrawArrow, EraseArrow,
+                  AnimMoveMan, AnimEraseMan,
                   DisplayMessage, DrawTreasure ;
 
-FROM AdvTreasure IMPORT ScatterTreasures, RespawnTreasure ;
+FROM AdvTreasure IMPORT ScatterTreasures, RespawnTreasure, SilentScatterTreasures ;
 
 
 CONST
-   SquaresPerSecond =    25 ;    (* speed of arrows *)
+   SquaresPerSecond = 25 ;    (* speed of arrows *)
    DelayPerSquare   = TicksPerSecond DIV SquaresPerSecond ;
 
 
@@ -189,6 +187,26 @@ BEGIN
 END GetDoorOnPoint ;
 
 
+PROCEDURE TimedDoorToSecret (roomno, x, y, dir: CARDINAL) : BOOLEAN ;
+VAR
+   success: BOOLEAN ;
+   DoorNo : CARDINAL ;
+BEGIN
+   IncPosition (x, y, dir) ;
+   GetDoorOnPoint (roomno, x, y, DoorNo, success) ;
+   IF success
+   THEN
+      IF Rooms[roomno].Doors[DoorNo].StateOfDoor = Timed
+      THEN
+         ChangeStatusOfDoor (roomno, DoorNo, Secret)
+      ELSE
+         success := FALSE
+      END
+   END ;
+   RETURN success
+END TimedDoorToSecret ;
+
+
 PROCEDURE OpenToClosedDoor (VAR Success: BOOLEAN) ;
 VAR
    x, y, DoorNo: CARDINAL ;
@@ -277,6 +295,31 @@ BEGIN
 END SecretToClosedDoor ;
 
 
+PROCEDURE ClosedToTimedDoor () : BOOLEAN ;
+VAR
+   x, y, DoorNo: CARDINAL ;
+   success     : BOOLEAN ;
+BEGIN
+   WITH Player[PlayerNo()] DO
+      x := Xman ;
+      y := Yman ;
+      IncPosition( x, y, Direction ) ;
+      GetDoorOnPoint (RoomOfMan, x, y, DoorNo, success) ;
+      IF success
+      THEN
+         IF Rooms[RoomOfMan].Doors[DoorNo].StateOfDoor = Closed
+         THEN
+            ChangeStatusOfDoor (RoomOfMan, DoorNo, Timed) ;
+            success := TRUE
+         ELSE
+            success := FALSE
+         END
+      END
+   END ;
+   RETURN success
+END ClosedToTimedDoor ;
+
+
 PROCEDURE PointOnWall (RoomNo, x, y: CARDINAL ;
                        VAR Success: BOOLEAN) ;
 VAR
@@ -305,6 +348,11 @@ BEGIN
    Success := FALSE ;
    WHILE (NOT Success) AND (TreasNo<=MaxNoOfTreasures) DO
       WITH Treasure[TreasNo] DO
+         IF (Rm = RoomNo) AND (kind # onfloor)
+         THEN
+            printf ("warning treasure %d is not on the floor\n",
+                    TreasNo)
+         END ;
          IF (Rm = RoomNo) AND (kind = onfloor)
          THEN
             IF (Xpos=x) AND (Ypos=y)
@@ -356,7 +404,7 @@ BEGIN
    WHILE (i<NextFreePlayer) AND yes DO
       IF p#i
       THEN
-         IF (Player[i].DeathType=living) AND IsPlayerActive(i)
+         IF (Player[i].Entity.DeathType = living) AND IsPlayerActive (i)
          THEN
             yes := FALSE
          END
@@ -406,7 +454,7 @@ BEGIN
             THEN
                GetReadAccessToPlayer ;
                WITH Player[player] DO
-                  IF MagicShield IN TreasureOwn
+                  IF MagicShield IN Entity.TreasureOwn
                   THEN
                      done := FALSE ;
                      d := (d+2) MOD 4 ;
@@ -430,31 +478,31 @@ BEGIN
 
                GetAccessToScreenNo(player) ;
                UpDateWoundsAndFatigue(player) ;
-               IF Wounds<=DammageByFireArrow
+               IF Entity.Wounds <= GetDamageFirePlayer (player, FALSE)
                THEN
                   r := RoomOfMan ;
                   SlainP := TRUE ;
-                  Wounds := 0 ;
-                  DeathType := normalarrow ;
+                  Entity.Wounds := 0 ;
+                  Entity.DeathType := normalarrow ;
                ELSE
-                  DEC( Wounds, DammageByFireArrow )
+                  DEC (Entity.Wounds, GetDamageFirePlayer (player, FALSE))
                END ;
-               WriteWounds(player, Wounds) ;
-               WriteCommentLine1(player, 'struck thee') ;
-               DelCommentLine2(player) ;
-               DelCommentLine3(player) ;
-               ReleaseAccessToScreenNo(player) ;
+               WriteWounds (player, Entity.Wounds) ;
+               WriteCommentLine1 (player, 'struck thee') ;
+               DelCommentLine2 (player) ;
+               DelCommentLine3 (player) ;
+               ReleaseAccessToScreenNo (player) ;
 
-               GetAccessToScreenNo(p) ;
-               IF Wounds=0
+               GetAccessToScreenNo (p) ;
+               IF Entity.Wounds = 0
                THEN
-                  DelCommentLine1(p) ;
-                  WriteCommentLine2(p, 'slain') ;
-                  WriteCommentLine3(p,  ManName )
+                  DelCommentLine1 (p) ;
+                  WriteCommentLine2 (p, 'slain') ;
+                  WriteCommentLine3 (p,  Entity.Name )
                ELSE
-                  WriteCommentLine1(p, 'thwunk') ;
-                  DelCommentLine2(p) ;
-                  DelCommentLine3(p)
+                  WriteCommentLine1 (p, 'thwunk') ;
+                  DelCommentLine2 (p) ;
+                  DelCommentLine3 (p)
                END ;
                ReleaseAccessToScreenNo(p) ;
                ReleaseWriteAccessToPlayer
@@ -495,47 +543,47 @@ BEGIN
 
                GetAccessToScreenNo(player) ;
                UpDateWoundsAndFatigue(player) ;
-               IF Wounds<=DammageByFireMagic
+               IF Entity.Wounds <= GetDamageFirePlayer (player, TRUE)
                THEN
                   r := RoomOfMan ;
                   SlainP := TRUE ;
-                  DeathType := magicarrow ;
-                  Wounds := 0
+                  Entity.DeathType := magicarrow ;
+                  Entity.Wounds := 0
                ELSE
-                  DEC(Wounds, DammageByFireMagic)
+                  DEC (Entity.Wounds, GetDamageFirePlayer (player, TRUE))
                END ;
-               WriteWounds(player, Wounds) ;
-               WriteCommentLine1(player, 'struck thee') ;
-               DelCommentLine2(player) ;
-               DelCommentLine3(player) ;
-               ReleaseAccessToScreenNo(player) ;
+               WriteWounds (player, Entity.Wounds) ;
+               WriteCommentLine1 (player, 'struck thee') ;
+               DelCommentLine2 (player) ;
+               DelCommentLine3 (player) ;
+               ReleaseAccessToScreenNo (player) ;
 
-               GetAccessToScreenNo(p) ;
+               GetAccessToScreenNo (p) ;
 
-               IF Wounds=0
+               IF Entity.Wounds = 0
                THEN
-                  DelCommentLine1(p) ;
-                  WriteCommentLine2(p, 'slain') ;
-                  WriteCommentLine3(p,  ManName)
+                  DelCommentLine1 (p) ;
+                  WriteCommentLine2 (p, 'slain') ;
+                  WriteCommentLine3 (p,  Entity.Name)
                ELSE
-                  WriteCommentLine1(p, 'thwunk') ;
-                  DelCommentLine2(p) ;
-                  DelCommentLine3(p)
+                  WriteCommentLine1 (p, 'thwunk') ;
+                  DelCommentLine2 (p) ;
+                  DelCommentLine3 (p)
                END ;
-               ReleaseAccessToScreenNo(p) ;
+               ReleaseAccessToScreenNo (p) ;
                ReleaseWriteAccessToPlayer
             END
          ELSE
             GetAccessToScreenNo(p) ;
 
-            WriteCommentLine1(p, 'swish') ;
-            DelCommentLine2(p) ;
-            DelCommentLine3(p) ;
-            ReleaseAccessToScreenNo(p)
+            WriteCommentLine1 (p, 'swish') ;
+            DelCommentLine2 (p) ;
+            DelCommentLine3 (p) ;
+            ReleaseAccessToScreenNo (p)
          END ;
          IF SlainP
          THEN
-            Dead(player, r)
+            Dead (player, r)
          END
       END
    END
@@ -623,17 +671,10 @@ END FireArrow ;
 
 PROCEDURE Exit ;
 VAR
-   p  : CARDINAL ;
-   yes: BOOLEAN ;
+   p: CARDINAL ;
 BEGIN
    p := PlayerNo() ;
-   GetReadAccessToPlayer ;
-   TestIfLastLivePlayer(yes) ;
-   ReleaseReadAccessToPlayer ;
-   IF NOT yes
-   THEN
-      Dead(p, Player[p].RoomOfMan)
-   END
+   Dead (p, Player[p].RoomOfMan)
 END Exit ;
 
 
@@ -647,20 +688,153 @@ VAR
 BEGIN
    IF n>0
    THEN
-      p := PlayerNo() ;
-      GetWriteAccessToPlayer ;
-      MoveMan1(n, p) ;
-      ReleaseWriteAccessToPlayer ;
-      IF Player[p].DeathType=exitdungeon
+      p := PlayerNo () ;
+      IF IsDeviceAnim (p)
       THEN
-         TestIfLastLivePlayer(yes) ;
-         IF NOT yes
-         THEN
-            Dead(p, Player[0].RoomOfMan)
-         END
+         MoveAnim (n, p)
+      ELSE
+         MoveMan1 (n, p)
+      END ;
+      IF Player[p].Entity.DeathType = exitdungeon
+      THEN
+         Dead (p, Player[0].RoomOfMan)
       END
    END
 END MoveMan ;
+
+
+(*
+   UpdatePos -
+*)
+
+PROCEDURE UpdatePos (p: CARDINAL; x, y: CARDINAL; Sx, Sy: CARDINAL;
+                     newroom, oldroom: CARDINAL) ;
+VAR
+   scaled: BOOLEAN ;
+BEGIN
+   WITH Player[p] DO
+      IF (x#Xman) OR (y#Yman)
+      THEN
+         Xman := x ;
+         Yman := y ;
+         ScaleSights (x, y, Sx, Sy, scaled) ;
+         ScreenX := Sx ;
+         ScreenY := Sy ;
+         RoomOfMan := newroom ;
+         IF newroom#0
+         THEN
+            IF (oldroom # newroom) OR scaled
+            THEN
+               IF scaled
+               THEN
+                  InitScreen (p)
+               ELSE
+                  GetAccessToScreenNo (p) ;
+                  WriteRoom (p, newroom) ;
+                  ReleaseAccessToScreenNo (p)
+               END ;
+               ClearRoom (oldroom) ;
+               DrawRoom
+            END ;
+            DrawMan (p)
+         END
+      ELSE
+         DrawMan (p)
+      END
+   END
+END UpdatePos ;
+
+
+PROCEDURE MoveAnim (n, p: CARDINAL) ;
+VAR
+   delayPerSquare,
+   x, y,
+   i, j, s,
+   r,  dir,
+   tr, z,
+   Sx, Sy,
+   DoorNo        : CARDINAL ;
+   hit           : BOOLEAN ;
+BEGIN
+   GetWriteAccessToPlayer ;
+   IF StrengthToMove (n)
+   THEN
+      delayPerSquare := GetRateMove (n) * TicksPerSecond DIV n ;
+      WITH Player[p] DO
+         dir := Direction ;
+         tr := RoomOfMan ;
+         x := Xman ;
+         y := Yman ;
+         Sx := ScreenX ;
+         Sy := ScreenY ;
+         hit := FALSE ;
+         s := 1 ;
+         i := x ;
+         j := y ;
+         r := tr ;
+         WHILE (s<=n) AND (NOT hit) DO
+            IncPosition (i, j, dir) ;
+            GetReadAccessToDoor ;
+            GetDoorOnPoint (r, i, j, DoorNo, hit) ;
+            IF hit
+            THEN
+               IF Rooms[r].Doors[DoorNo].StateOfDoor=Open
+               THEN
+                  AnimEraseMan (p) ;
+                  z := Rooms[r].Doors[DoorNo].LeadsTo ;
+                  ReleaseReadAccessToDoor ;
+                  IF z=0
+                  THEN
+                     Entity.DeathType := exitdungeon
+                  ELSE
+                     IncPosition(i, j, dir) ;
+                     TakenPointInRoom(z, i, j, hit) ;
+                     IF NOT hit  (* Empty Point In Room *)
+                     THEN
+                        INC(s) ;
+                        x := i ;
+                        y := j ;
+                        r := z  (* Ok so changed room *)
+                     END
+                  END
+               ELSE
+                  ReleaseReadAccessToDoor
+               END ;
+            ELSE
+               ReleaseReadAccessToDoor ;
+               PointOnWall(r, i, j, hit) ;
+               IF NOT hit
+               THEN
+                  GetReadAccessToTreasure ;
+                  PointOnTreasure(r, i, j, z, hit) ;
+                  ReleaseReadAccessToTreasure ;
+                  IF NOT hit
+                  THEN
+                     hit := PointOnOtherPlayer(i, j, z) ;
+                     IF NOT hit
+                     THEN
+                        AnimMoveMan (p, s, n, dir) ;
+                        x := i ;
+                        y := j ;
+                        INC (s) ;
+                        UpdatePos (p, x, y, Sx, Sy, r, tr) ;
+                        ReleaseWriteAccessToPlayer ;
+                        Sleep (delayPerSquare) ;
+                        GetWriteAccessToPlayer ;
+                        tr := RoomOfMan ;
+                        x := Xman ;
+                        y := Yman ;
+                        Sx := ScreenX ;
+                        Sy := ScreenY ;
+                     END
+                  END
+               END
+            END
+         END
+      END
+   END ;
+   ReleaseWriteAccessToPlayer
+END MoveAnim ;
 
 
 PROCEDURE MoveMan1 (n, p: CARDINAL) ;
@@ -673,8 +847,8 @@ VAR
    DoorNo : CARDINAL ;
    hit    : BOOLEAN ;
 BEGIN
-   StrengthToMove(n, hit) ;
-   IF hit
+   GetWriteAccessToPlayer ;
+   IF StrengthToMove (n)
    THEN
       WITH Player[p] DO
          EraseMan(p) ;
@@ -701,7 +875,7 @@ BEGIN
                   ReleaseReadAccessToDoor ;
                   IF z=0
                   THEN
-                     DeathType := exitdungeon
+                     Entity.DeathType := exitdungeon
                   ELSE
                      IncPosition(i, j, dir) ;
                      TakenPointInRoom(z, i, j, hit) ;
@@ -726,7 +900,7 @@ BEGIN
                   ReleaseReadAccessToTreasure ;
                   IF NOT hit
                   THEN
-                     PointOnOtherPlayer(i, j, z, hit) ;
+                     hit := PointOnOtherPlayer(i, j, z) ;
                      IF NOT hit
                      THEN
                         x := i ;
@@ -766,7 +940,8 @@ BEGIN
             DrawMan(p)
          END
       END
-   END
+   END ;
+   ReleaseWriteAccessToPlayer
 END MoveMan1 ;
 
 
@@ -786,7 +961,7 @@ BEGIN
          (* No need to get Read Access To Player 's since taken care of *)
          (* in the called routine.                                      *)
 
-         PointOnOtherPlayer(x, y, z, ok) ;
+         ok := PointOnOtherPlayer(x, y, z) ;
          IF NOT ok
          THEN
             GetReadAccessToTreasure ;
@@ -849,316 +1024,184 @@ BEGIN
 END Dec ;
 
 
-PROCEDURE Parry ;
+(*
+   Damage -
+*)
+
+PROCEDURE Damage (inflict: CARDINAL; amountOfDamage: CARDINAL;
+                  deathType: TypeOfDeath; VAR roomOfDeath: CARDINAL) : BOOLEAN ;
 VAR
-   p, r, x, y, Pn : CARDINAL ;
-   hit, SlainP    : BOOLEAN ;
+   p: CARDINAL ;
+   slain: BOOLEAN ;
 BEGIN
-   SlainP := FALSE ;
-   p := PlayerNo() ;
+   p := PlayerNo () ;
+   GetAccessToScreenNo (p) ;
+   WITH Player[inflict] DO
+      IF Entity.Wounds > amountOfDamage
+      THEN
+         slain := FALSE ;
+         DEC (Entity.Wounds, amountOfDamage) ;
+         WriteCommentLine1 (p, 'hit') ;
+         DelCommentLine2 (p) ;
+         DelCommentLine3 (p)
+      ELSE
+         roomOfDeath := RoomOfMan ;
+         slain := TRUE ;
+         Entity.Wounds := 0 ;
+         Entity.DeathType := deathType ;
+         DelCommentLine1 (p) ;
+         WriteCommentLine2 (p, 'Slain') ;
+         WriteCommentLine3 (p, Entity.Name )
+      END
+   END ;
+   ReleaseAccessToScreenNo(p) ;
+   RETURN slain
+END Damage ;
+
+
+PROCEDURE Sword (VAR PlayerNoSlain, RoomOfSlain: CARDINAL;
+                 getDamage: getQueryCardinal) : BOOLEAN ;
+VAR
+   isSlain, hit: BOOLEAN ;
+   p, x, y     : CARDINAL ;
+BEGIN
+   isSlain := FALSE ;
+   p := PlayerNo () ;
    WITH Player[p] DO
-      GetWriteAccessToPlayer ;
-      StrengthToParry(hit) ;
+      GetReadAccessToPlayer ;
+      x := Xman ;
+      y := Yman ;
+      IncPosition(x, y, Direction) ;
+      hit := PointOnOtherPlayer (x, y, PlayerNoSlain) ;
+      ReleaseReadAccessToPlayer ;
       IF hit
       THEN
-         ReleaseWriteAccessToPlayer ;
-         GetReadAccessToPlayer ;
-         x := Xman ;
-         y := Yman ;
-         IncPosition(x, y, Direction) ;
-         PointOnOtherPlayer(x, y, Pn, hit) ;
-         ReleaseReadAccessToPlayer ;
-         IF hit
-         THEN
-            WITH Player[Pn] DO
-               GetWriteAccessToPlayer ;
+         WITH Player[PlayerNoSlain] DO
+            GetWriteAccessToPlayer ;
 
-               GetAccessToScreenNo(Pn) ;
-               UpDateWoundsAndFatigue(Pn) ;
-               ReleaseAccessToScreenNo(Pn) ;
+            GetAccessToScreenNo (PlayerNoSlain) ;
+            UpDateWoundsAndFatigue (PlayerNoSlain) ;
+            ReleaseAccessToScreenNo (PlayerNoSlain) ;
 
-               IF MagicSword IN Player[p].TreasureOwn
-               THEN
-                  GetAccessToScreenNo(p) ;
-                  IF Wounds>DammageByMagicParry
-                  THEN
-                     DEC(Wounds, DammageByMagicParry) ;
-                     WriteCommentLine1(p, 'hit') ;
-                     DelCommentLine2(p) ;
-                     DelCommentLine3(p)
-                  ELSE
-                     r := RoomOfMan ;
-                     SlainP := TRUE ;
-                     Wounds := 0 ;
-                     DeathType := sword ;
-                     DelCommentLine1(p) ;
-                     WriteCommentLine2(p, 'Slain') ;
-                     WriteCommentLine3(p, ManName )
-                  END ;
-                  ReleaseAccessToScreenNo(p)
-               ELSE
-                  GetAccessToScreenNo(p) ;
-                  IF Wounds>DammageByParry
-                  THEN
-                     DEC( Wounds, DammageByParry ) ;
-                     WriteCommentLine1(p, 'hit') ;
-                     DelCommentLine2(p) ;
-                     DelCommentLine3(p)
-                  ELSE
-                     r := RoomOfMan ;
-                     SlainP := TRUE ;
-                     Wounds := 0 ;
-                     DeathType := sword ;
-                     DelCommentLine1(p) ;
-                     WriteCommentLine2(p, 'Slain') ;
-                     WriteCommentLine3(p, ManName ) ;
-                  END ;
-                  ReleaseAccessToScreenNo(p)
-               END ;
+            isSlain := Damage (PlayerNoSlain, getDamage (), sword, RoomOfSlain) ;
 
-               GetAccessToScreenNo(Pn) ;
-               WriteCommentLine1(Pn, 'hit thee') ;
-               DelCommentLine2(Pn) ;
-               DelCommentLine3(Pn) ;
-               WriteWounds( Pn, Wounds ) ;
-               ReleaseAccessToScreenNo(Pn) ;
+            GetAccessToScreenNo (PlayerNoSlain) ;
+            WriteCommentLine1 (PlayerNoSlain, 'hit thee') ;
+            DelCommentLine2 (PlayerNoSlain) ;
+            DelCommentLine3 (PlayerNoSlain) ;
+            WriteWounds (PlayerNoSlain, Entity.Wounds ) ;
+            ReleaseAccessToScreenNo (PlayerNoSlain) ;
 
-               ReleaseWriteAccessToPlayer
-            END
-         ELSE
-            GetAccessToScreenNo(p) ;
-            WriteCommentLine1(p, 'missed') ;
-            DelCommentLine2(p) ;
-            DelCommentLine3(p) ;
-            ReleaseAccessToScreenNo(p)
+            ReleaseWriteAccessToPlayer
          END
+      ELSE
+         GetAccessToScreenNo (p) ;
+         WriteCommentLine1 (p, 'missed') ;
+         DelCommentLine2 (p) ;
+         DelCommentLine3 (p) ;
+         ReleaseAccessToScreenNo (p)
+      END
+   END ;
+   RETURN isSlain
+END Sword ;
+
+
+PROCEDURE TrySwingSword (isQuery: isQueryBoolean; getDamage: getQueryCardinal) ;
+VAR
+   PlayerNoSlain,
+   p, x, y,
+   RoomOfSlain  : CARDINAL ;
+   isSlain      : BOOLEAN ;
+BEGIN
+   isSlain := FALSE ;
+   p := PlayerNo () ;
+   WITH Player[p] DO
+      GetWriteAccessToPlayer ;
+      IF isQuery ()
+      THEN
+         ReleaseWriteAccessToPlayer ;
+         isSlain := Sword (PlayerNoSlain, RoomOfSlain, getDamage)
       ELSE
          ReleaseWriteAccessToPlayer
       END
    END ;
-   IF SlainP
+   IF isSlain
    THEN
-      Dead( Pn, r )
+      Dead (PlayerNoSlain, RoomOfSlain)
    END
+END TrySwingSword ;
+
+
+PROCEDURE Parry ;
+BEGIN
+   TrySwingSword (StrengthToParry, GetDamageByParry)
 END Parry ;
 
 
 PROCEDURE Attack ;
-VAR
-   p, r, x, y, Pn : CARDINAL ;
-   hit, SlainP    : BOOLEAN ;
 BEGIN
-   SlainP := FALSE ;
-   p := PlayerNo() ;
-   WITH Player[p] DO
-      GetWriteAccessToPlayer ;
-      StrengthToAttack( hit ) ;
-      IF hit
-      THEN
-         ReleaseWriteAccessToPlayer ;
-         GetReadAccessToPlayer ;
-         x := Xman ;
-         y := Yman ;
-         IncPosition(x, y, Direction) ;
-         PointOnOtherPlayer(x, y, Pn, hit) ;
-         ReleaseReadAccessToPlayer ;
-         IF hit
-         THEN
-            WITH Player[Pn] DO
-               GetWriteAccessToPlayer ;
-
-               GetAccessToScreenNo(Pn) ;
-               UpDateWoundsAndFatigue(Pn) ;
-               ReleaseAccessToScreenNo(Pn) ;
-
-               IF MagicSword IN Player[p].TreasureOwn
-               THEN
-                  GetAccessToScreenNo(p) ;
-                  IF Wounds>DammageByMagicAttack
-                  THEN
-                     DEC(Wounds, DammageByMagicAttack) ;
-                     WriteCommentLine1(p, 'hit') ;
-                     DelCommentLine2(p) ;
-                     DelCommentLine3(p)
-                  ELSE
-                     r := RoomOfMan ;
-                     SlainP := TRUE ;
-                     Wounds := 0 ;
-                     DeathType := sword ;
-                     DelCommentLine1(p) ;
-                     WriteCommentLine2(p, 'Slain') ;
-                     WriteCommentLine3(p, ManName)
-                  END ;
-                  ReleaseAccessToScreenNo( p )
-               ELSE
-                  GetAccessToScreenNo( p ) ;
-                  IF Wounds>DammageByAttack
-                  THEN
-                     DEC( Wounds, DammageByAttack ) ;
-                     WriteCommentLine1(p, 'hit') ;
-                     DelCommentLine2(p) ;
-                     DelCommentLine3(p)
-                  ELSE
-                     r := RoomOfMan ;
-                     SlainP := TRUE ;
-                     Wounds := 0 ;
-                     DeathType := sword ;
-                     DelCommentLine1(p) ;
-                     WriteCommentLine2(p, 'Slain') ;
-                     WriteCommentLine3(p, ManName)
-                  END ;
-                  ReleaseAccessToScreenNo(p)
-               END ;
-
-               GetAccessToScreenNo(Pn) ;
-
-               WriteCommentLine1(Pn, 'hit thee') ;
-               DelCommentLine2(Pn) ;
-               DelCommentLine3(Pn) ;
-               WriteWounds(Pn, Wounds) ;
-               ReleaseAccessToScreenNo(Pn) ;
-
-               ReleaseWriteAccessToPlayer
-            END
-         ELSE
-            GetAccessToScreenNo(p) ;
-            WriteCommentLine1(p, 'missed') ;
-            DelCommentLine2(p) ;
-            DelCommentLine3(p) ;
-            ReleaseAccessToScreenNo(p)
-         END
-      ELSE
-         ReleaseWriteAccessToPlayer
-      END
-   END ;
-   IF SlainP
-   THEN
-      Dead( Pn, r )
-   END
+   TrySwingSword (StrengthToAttack, GetDamageByAttack)
 END Attack ;
 
 
 PROCEDURE Thrust ;
-VAR
-   p, r, x, y, Pn : CARDINAL ;
-   hit, SlainP    : BOOLEAN ;
 BEGIN
-   SlainP := FALSE ;
-   p := PlayerNo() ;
-   WITH Player[p] DO
-      GetWriteAccessToPlayer ;
-      StrengthToThrust(hit) ;
-      IF hit
-      THEN
-         ReleaseWriteAccessToPlayer ;
-         GetReadAccessToPlayer ;
-         x := Xman ;
-         y := Yman ;
-         IncPosition(x, y, Direction) ;
-         PointOnOtherPlayer(x, y, Pn, hit) ;
-         ReleaseReadAccessToPlayer ;
-         IF hit
-         THEN
-            WITH Player[Pn] DO
-               GetWriteAccessToPlayer ;
-
-               GetAccessToScreenNo(Pn) ;
-               UpDateWoundsAndFatigue(Pn) ;
-               ReleaseAccessToScreenNo(Pn) ;
-
-               IF MagicSword IN Player[p].TreasureOwn
-               THEN
-                  GetAccessToScreenNo(p) ;
-                  IF Wounds>DammageByMagicThrust
-                  THEN
-                     DEC(Wounds, DammageByMagicThrust) ;
-                     WriteCommentLine1(p, 'hit') ;
-                     DelCommentLine2(p) ;
-                     DelCommentLine3(p)
-                  ELSE
-                     r := RoomOfMan ;
-                     SlainP := TRUE ;
-                     Wounds := 0 ;
-                     DeathType := sword ;
-                     DelCommentLine1(p) ;
-                     WriteCommentLine2(p, 'Slain') ;
-                     WriteCommentLine3(p, ManName)
-                  END ;
-                  ReleaseAccessToScreenNo(p)
-               ELSE
-                  GetAccessToScreenNo(p) ;
-                  IF Wounds>DammageByThrust
-                  THEN
-                     DEC(Wounds, DammageByThrust) ;
-                     WriteCommentLine1(p, 'hit') ;
-                     DelCommentLine2(p) ;
-                     DelCommentLine3(p)
-                  ELSE
-                     r := RoomOfMan ;
-                     SlainP := TRUE ;
-                     Wounds := 0 ;
-                     DeathType := sword ;
-                     DelCommentLine1(p) ;
-                     WriteCommentLine2(p, 'Slain') ;
-                     WriteCommentLine3(p, ManName)
-                  END ;
-                  ReleaseAccessToScreenNo( p )
-               END ;
-
-               GetAccessToScreenNo(Pn) ;
-
-               WriteCommentLine1(Pn, 'hit thee') ;
-               DelCommentLine2(Pn) ;
-               DelCommentLine3(Pn) ;
-               WriteWounds( Pn, Wounds ) ;
-               ReleaseAccessToScreenNo(Pn) ;
-
-               ReleaseWriteAccessToPlayer
-            END
-         ELSE
-            GetAccessToScreenNo(p) ;
-            WriteCommentLine1(p, 'missed') ;
-            DelCommentLine2(p) ;
-            DelCommentLine3(p) ;
-            ReleaseAccessToScreenNo(p)
-         END
-      ELSE
-         ReleaseWriteAccessToPlayer
-      END
-   END ;
-   IF SlainP
-   THEN
-      Dead( Pn, r )
-   END
+   TrySwingSword (StrengthToThrust, GetDamageByThrust)
 END Thrust ;
+
+
+(*
+   Alive - return TRUE if the entity is still alive.  If it is not alive
+           mark it in room 0 and out of the map.
+*)
+
+PROCEDURE Alive () : BOOLEAN ;
+VAR
+   p   : CARDINAL ;
+   Dead: BOOLEAN ;
+BEGIN
+   p := PlayerNo () ;
+   WITH Player[p] DO
+      IF Entity.DeathType = living
+      THEN
+         RETURN TRUE
+      ELSE
+         RoomOfMan := 0 ;
+         Xman := MaxCard - Width ;
+         Yman := MaxCard - Height ;
+         RETURN FALSE
+      END
+   END
+END Alive ;
+
 
 
 (* Tests to see whether the point is occupied by another player. *)
 (* This procedure does NOT use any lock.                         *)
 
-PROCEDURE PointOnOtherPlayer (x, y: CARDINAL ;
-                              VAR Pn: CARDINAL ; VAR Success: BOOLEAN) ;
+PROCEDURE PointOnOtherPlayer (x, y: CARDINAL;
+                              VAR Pn: CARDINAL) : BOOLEAN ;
 VAR
    p: CARDINAL ;
 BEGIN
-   Success := FALSE ;
    p := PlayerNo() ;
    Pn := 0 ;
-   WHILE (Pn<NextFreePlayer) AND (NOT Success) DO
-      IF (Pn#p) AND IsPlayerActive(Pn)
+   WHILE Pn < NextFreePlayer DO
+      IF (Pn#p) AND IsPlayerActive (Pn)
       THEN
          WITH Player[Pn] DO
             IF (Xman=x) AND (Yman=y)
             THEN
-               Success := TRUE
+               RETURN TRUE
             ELSE
-               INC( Pn )
+               INC (Pn)
             END
          END
       ELSE
-         INC( Pn )
+         INC (Pn)
       END
-   END
+   END ;
+   RETURN FALSE
 END PointOnOtherPlayer ;
 
 
@@ -1222,26 +1265,6 @@ BEGIN
 END CloseDoor ;
 
 
-PROCEDURE HideDoor ;
-VAR
-   Success: BOOLEAN ;
-BEGIN
-   GetReadAccessToPlayer ;
-   GetWriteAccessToDoor ;
-   ClosedToSecretDoor(Success) ;
-   GetAccessToScreen ;
-   IF Success
-   THEN
-      DelCommentLine1(PlayerNo())
-   ELSE
-      WriteCommentLine1(PlayerNo(), 'thou canst')
-   END ;
-   ReleaseAccessToScreen ;
-   ReleaseWriteAccessToDoor ;
-   ReleaseReadAccessToPlayer
-END HideDoor ;
-
-
 (* Speak Function                                                     *)
 
 PROCEDURE Speak ;
@@ -1293,8 +1316,6 @@ BEGIN
 END Speak ;
 
 
-(* Assumes we are configured to write to player, p, *)
-
 PROCEDURE Dead (p, room : CARDINAL) ;
 BEGIN
    WITH Player[p] DO
@@ -1303,8 +1324,13 @@ BEGIN
       THEN
          GetReadAccessToDoor ;
          GetWriteAccessToTreasure ;
-         ScatterTreasures(p, room) ;
-         EraseMan(p) ;
+         IF fd=-1
+         THEN
+            SilentScatterTreasures (p, room)
+         ELSE
+            ScatterTreasures (p, room) ;
+            EraseMan(p) ;
+         END ;
          ReleaseWriteAccessToTreasure ;
          ReleaseReadAccessToDoor
       END ;
@@ -1459,7 +1485,7 @@ BEGIN
    IF Success
    THEN
       i := 1 ;
-      WHILE (i<=MaxNoOfTreasures) AND Success DO
+      WHILE (i <= MaxNoOfTreasures) AND Success DO
          WITH Treasure[i] DO
             IF (Rm=room) AND (kind=onfloor)
             THEN

@@ -20,7 +20,8 @@ IMPLEMENTATION MODULE AdvIntroduction ;
 
 FROM SYSTEM IMPORT ADR, SIZE ;
 FROM ASCII IMPORT lf, cr, nul ;
-FROM StrLib IMPORT StrLen ;
+FROM StrLib IMPORT StrLen, StrEqual, StrCopy ;
+FROM StrCase IMPORT StrToLowerCase ;
 FROM SocketControl IMPORT nonBlocking, ignoreSignals ;
 
 FROM Executive IMPORT WaitForIO, InitProcess, InitSemaphore, Wait, Signal, Resume,
@@ -30,19 +31,23 @@ FROM RTint IMPORT InitInputVector ;
 FROM COROUTINES IMPORT PROTECTION ;
 FROM sckt IMPORT tcpServerState, tcpServerEstablish, tcpServerAccept, tcpServerSocketFd ;
 FROM libc IMPORT printf, read, write ;
-FROM AdvUtil IMPORT Positioning, TestIfLastLivePlayer ;
+FROM AdvUtil IMPORT Positioning, TestIfLastLivePlayer, InitialDisplay ;
 
 FROM AdvSystem IMPORT Player, TypeOfDeath, StartPlayer, PlayerNo,
+                      TypeOfEntity,
                       ClientRead, DefaultWrite, UnAssign,
                       ReadString, GetReadAccessToPlayer,
                       ReleaseReadAccessToPlayer,
                       GetAccessToScreen, ReleaseAccessToScreen ;
 
 FROM AdvTreasure IMPORT DisplayEnemy, Grenade ;
-FROM AdvUtil IMPORT InitialDisplay ;
 FROM AdvCmd IMPORT ExecuteCommand ;
-FROM Screen IMPORT WriteCommand, ClearScreen, WriteString, PromptString, Pause, Quit ;
+
+FROM Screen IMPORT WriteCommand, ClearScreen, WriteString, PromptString, Pause, Quit,
+                   EnterCombat ;
+
 FROM AdvSound IMPORT EnterGame ;
+FROM AdvMath IMPORT GetEntityName, GetEntityWeightDefault ;
 FROM StdIO IMPORT PushOutput ;
 
 
@@ -114,17 +119,17 @@ VAR
    ch  : CHAR ;
    p   : CARDINAL ;
 BEGIN
-   EquipKnight ;
-   SetUpKnight ;
+   ConfigureEntity ;
    InitialDisplay ;
-   p := PlayerNo() ;
-   EnterGame(p) ;
+   p := PlayerNo () ;
+   EnterGame (p) ;
+   EnterCombat (p) ;
    Dead := FALSE ;
    REPEAT
-      IF ClientRead(ch)
+      IF ClientRead (ch)
       THEN
-         WriteCommand(p, ch) ;
-         ExecuteCommand(ch, Dead)
+         WriteCommand (p, ch) ;
+         ExecuteCommand (ch, Dead)
       ELSE
          Dead := TRUE
       END
@@ -137,7 +142,7 @@ PROCEDURE Copyleft ;
 VAR
    p: CARDINAL ;
 BEGIN
-   p := PlayerNo() ;
+   p := PlayerNo () ;
    ClearScreen(p) ;
    WriteString(p, 'Written whilst on holiday during the rainy months of\n') ;
    WriteString(p, 'August 85, August 86 and ported to GNU/linux during July/August 2005\n\n') ;
@@ -155,7 +160,7 @@ PROCEDURE Title ;
 VAR
    p: CARDINAL ;
 BEGIN
-   p := PlayerNo() ;
+   p := PlayerNo () ;
    ClearScreen(p) ;
    WriteString(p, '...set in a time of long ago, when life hast no value and\n') ;
    WriteString(p, '   death sometimes, hadst a price. Thou needst to be quick\n') ;
@@ -164,22 +169,113 @@ BEGIN
 END Title ;
 
 
-PROCEDURE EquipKnight ;
+(*
+   displayEntityTypeChoice -
+*)
+
+PROCEDURE displayEntityTypeChoice ;
+VAR
+   p     : CARDINAL ;
+   entity: TypeOfEntity ;
+   name  : ARRAY [0..80] OF CHAR ;
+BEGIN
+   p := PlayerNo () ;
+   WriteString (p, 'The character classes available are:\n') ;
+   FOR entity := MIN (TypeOfEntity) TO MAX (TypeOfEntity) DO
+      GetEntityName (entity, name) ;
+      WriteString (p, name) ; WriteString (p, '\n')
+   END
+END displayEntityTypeChoice ;
+
+
+(*
+   lookupEntityType - return TRUE if typename matches a char class entity and set entity,
+                      otherwise return FALSE and leave entity alone.
+*)
+
+PROCEDURE lookupEntityType (typename: ARRAY OF CHAR; VAR entity: TypeOfEntity) : BOOLEAN ;
+VAR
+   etype: TypeOfEntity ;
+   name : ARRAY [0..80] OF CHAR ;
+BEGIN
+   FOR etype := MIN (TypeOfEntity) TO MAX (TypeOfEntity) DO
+      GetEntityName (entity, name) ;
+      StrToLowerCase (name, name) ;
+      IF StrEqual (name, typename)
+      THEN
+         entity := etype ;
+         RETURN TRUE
+      END
+   END ;
+   RETURN FALSE
+END lookupEntityType ;
+
+
+(*
+   chooseEntityType - return the entity type choosen by the user.
+*)
+
+PROCEDURE chooseEntityType () : TypeOfEntity ;
+VAR
+   p       : CARDINAL ;
+   finished: BOOLEAN ;
+   entity  : TypeOfEntity ;
+   answer  : ARRAY [0..50] OF CHAR ;
+BEGIN
+   p := PlayerNo () ;
+   finished := FALSE ;
+   PromptString (p, 'What character class do you want to play (type help if unsure)? ') ;
+   REPEAT
+      ReadString (answer) ;
+      WriteString (p, '\n') ;
+      StrToLowerCase (answer, answer) ;
+      IF StrEqual (answer, 'help')
+      THEN
+         ClearScreen (p) ;
+         displayEntityTypeChoice
+      ELSE
+         finished := lookupEntityType (answer, entity) ;
+         IF NOT finished
+         THEN
+            ClearScreen (p) ;
+            PromptString (p, 'What character class do you want to play (type help if unsure)? ')
+         END
+      END
+   UNTIL finished ;
+   RETURN entity
+END chooseEntityType ;
+
+
+PROCEDURE ConfigureEntity ;
 VAR
    p: CARDINAL ;
 BEGIN
-   p := PlayerNo() ;
-   PromptString(p, 'What is thy name? ') ;
-   WITH Player[PlayerNo()] DO
-      ReadString(ManName)
+   p := PlayerNo () ;
+   WITH Player[p] DO
+      Entity.EntityType := chooseEntityType () ;
+      Entity.Leader := FALSE ;
+      Entity.DeathType := living ;
+      Entity.Weight := GetEntityWeightDefault (Entity.EntityType) ;
+      Entity.Wounds := 100 ;
+      Entity.Fatigue := 100 ;
+      Entity.TreasureOwn := BITSET {} ;
+      IF Entity.EntityType = human
+      THEN
+         ClearScreen (p) ;
+         PromptString (p, 'What is thy name? ') ;
+         ReadString (Entity.Name) ;
+      ELSE
+         StrCopy ('', Entity.Name) ;
+      END ;
+      SetUpKnight  (* --fixme-- should be per entity.  *)
    END ;
-   WriteString(p, '\n')
-END EquipKnight ;
+   WriteString (p, '\n')
+END ConfigureEntity ;
 
 
 PROCEDURE SetUpKnight ;
 BEGIN
-   WITH Player[PlayerNo()] DO
+   WITH Player[PlayerNo ()] DO
       NoOfMagic := 1 ;
       NoOfNormal := 7
    END ;
@@ -198,10 +294,10 @@ BEGIN
    GetAccessToScreen ;
    ClearScreen(p) ;
    WITH Player[p] DO
-      IF Wounds=0
+      IF Entity.Wounds = 0
       THEN
          WriteString(p, 'Thou art slain...') ;
-         GiveDescriptionOfDeath(p, DeathType)
+         GiveDescriptionOfDeath(p, Entity.DeathType)
       ELSE
          TestIfLastLivePlayer(yes) ;
          IF yes
@@ -210,14 +306,14 @@ BEGIN
          ELSE
             WriteString(p, 'Thou art the coward of the dungeon')
          END ;
-         Wounds := 0
+         Entity.Wounds := 0
       END ;
       WriteString(p, '\n\n\n')
    END ;
    ReleaseAccessToScreen ;
    ReleaseReadAccessToPlayer ;
-   Pause(p) ;
-   Quit(p)
+   Pause (p) ;
+   Quit (p)
 END GiveResults ;
 
 

@@ -32,7 +32,7 @@ TYPE
                      Y2 : CARDINAL
                   END ;
 
-   DoorStatus   = (Open, Closed, Secret) ;
+   DoorStatus   = (Open, Closed, Secret, Timed) ;
 
    Door         = RECORD
                      Position    : Line ;
@@ -41,7 +41,7 @@ TYPE
                   END ;
 
    TreasureKind = (unused, respawnnormal, respawnmagic,
-                   onperson, onfloor, normal, magic) ;
+                   onperson, onfloor, normal, magic, timeddoor) ;
 
    TreasureInfo = RECORD
                      Xpos         : CARDINAL ;
