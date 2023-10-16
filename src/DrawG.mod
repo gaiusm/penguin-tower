@@ -161,7 +161,7 @@ BEGIN
 END IsVisible ;
 
 
-PROCEDURE AnimMoveMan (p, s, n, dir: CARDINAL) ;
+PROCEDURE AnimMoveMan (p, s, n, dir, delay: CARDINAL) ;
 VAR
    Sx, Sy,
    pn, i, j,
@@ -189,7 +189,7 @@ BEGIN
             GetAccessToScreenNo (pn) ;
             IF IsVisible (pn, r, i, j)
             THEN
-               DrawL.AnimMoveMan (p#pn, x-Sx, y-Sy, i, j, dir, s, n)
+               DrawL.AnimMoveMan (p#pn, x-Sx, y-Sy, i, j, dir, s, n, delay)
             ELSE
                DrawL.AnimEraseMan (p#pn, x-Sx, y-Sy) ;
                Flush (pn)

@@ -1,770 +1,22 @@
 #!/usr/bin/env python3
 
-import os, pygame, _thread, sys, getopt, config
+import anim, argparse, os, pygame, _thread, sys, config
 
-from cliberty import printf
+from cliberty import _printf
 from pygame.locals import *
 from socket import *
 
-`"""
+sound_dict = {}
+history_list = []
+anim_queue = []
+TOGGLE_ANIM = "~!"   # special character sequence to toggle anim on/off
+ANIM_EVENT = USEREVENT+1
 
-def getFileName(subdir, filename):
-    global dataDirectory
-
-    if dataDirectory == "":
-        return os.path.join(subdir, filename)
-    else:
-        return os.path.join(dataDirectory, os.path.join(subdir, filename))
-
-def load_sound(name):
-    class NoneSound:
-        def play(self):
-            pass # pass means {} in C, C++ or Java
-    if not pygame.mixer or not pygame.mixer.get_init():
-        return NoneSound()
-    fullname = getFileName('sounds', name)
-    try:
-        sound = pygame.mixer.Sound(fullname)
-    except pygame.error as message:
-        print(('cannot load sound file:', fullname))
-        return NoneSound()
-    return sound
-
-def load_png(name):
-        """ Load image and return image object"""
-        fullname = getFileName('data', name)
-        try:
-                image = pygame.image.load(fullname)
-                if image.get_alpha() is None:
-                        image = image.convert()
-                else:
-                        image = image.convert_alpha()
-        except pygame.error as message:
-                print(('Cannot load image:', fullname))
-                raise SystemExit(message)
-        return image
-
-def initGraphics():
-    global screen, font, images, background, fullscreen
-
-    pygame.init()
-    screen = pygame.display.set_mode (Resolution, fullscreen)
-    pygame.display.set_caption ('Penguin Tower')
-    font = pygame.font.Font (None, FontSize)
-
-    pygame.mouse.set_visible(False)
-    images = {}
-    for i in ['wallh', 'wallv', 'doorh', 'doorv', 'hingeh', 'hingev',
-              'mann', 'mane', 'manw', 'mans',
-              'manN', 'manE', 'manW', 'manS',
-              'treasure',
-              'arrown', 'arrows', 'arrowe', 'arroww']:
-        images[i] = load_png(i + '.png')
-    background = pygame.Surface (screen.get_size())
-
-
-def finishGame():
-    # wait 3 seconds before exiting
-    pygame.time.delay(3000)
-    screen = pygame.display.set_mode((640, 480))
-
-
-def doHorizWall(background, x, y):
-    global images
-
-    image = images['wallh']
-    imagepos = images['wallh'].get_rect()
-    imagepos.top = background.get_rect().top+UnitY * y
-    imagepos.left = background.get_rect().left+UnitX * x
-    background.blit(image, imagepos)
-
-def drawHorizWall(coords):
-    global background
-    for i in range(int(coords[0]), int(coords[2])+1):
-        doHorizWall(background, i, int(coords[1]))
-
-def doVertWall(background, x, y):
-    global images
-
-    image = images['wallv']
-    imagepos = images['wallv'].get_rect()
-    imagepos.top = background.get_rect().top+UnitY * y
-    imagepos.left = background.get_rect().left+UnitX * x
-    background.blit(image, imagepos)
-
-def drawVertWall(coords):
-    global background
-    for j in range(int(coords[1]), int(coords[3])+1):
-        doVertWall(background, int(coords[0]), j)
-
-def doHorizDoor(background, x, y):
-    global images
-
-    image = images['doorh']
-    imagepos = images['doorh'].get_rect()
-    imagepos.top = background.get_rect().top+UnitY * y
-    imagepos.left = background.get_rect().left+UnitX * x
-    background.blit(image, imagepos)
-
-def drawHorizDoor(coords):
-    global background
-    for i in range(int(coords[0]), int(coords[2])+1):
-        doHorizDoor(background, i, int(coords[1]))
-
-def doVertDoor(background, x, y):
-    global images
-
-    image = images['doorv']
-    imagepos = images['doorv'].get_rect()
-    imagepos.top = background.get_rect().top+UnitY * y
-    imagepos.left = background.get_rect().left+UnitX * x
-    background.blit(image, imagepos)
-
-def drawVertDoor(coords):
-    global background
-    for j in range(int(coords[1]), int(coords[3])+1):
-        doVertDoor(background, int(coords[0]), j)
-
-def drawHorizHinge(coords):
-    global background, images
-
-    image = images['hingeh']
-    imagepos = images['hingeh'].get_rect()
-    imagepos.top = background.get_rect().top+UnitY * int(coords[1])
-    imagepos.left = background.get_rect().left+UnitX * int(coords[0])
-    background.blit(image, imagepos)
-
-def drawVertHinge(coords):
-    global background, images
-
-    image = images['hingev']
-    imagepos = images['hingev'].get_rect()
-    imagepos.top = background.get_rect().top+UnitY * int(coords[1])
-    imagepos.left = background.get_rect().left+UnitX * int(coords[0])
-    background.blit(image, imagepos)
-
-def doMan(imgname, coords):
-    global background, images
-
-    image = images[imgname]
-    imagepos = images[imgname].get_rect()
-    imagepos.top = background.get_rect().top+UnitY * int(coords[1])
-    imagepos.left = background.get_rect().left+UnitX * int(coords[0])
-    background.blit(image, imagepos)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawMann(coords):
-    doMan('mann', coords)
-
-def drawMane(coords):
-    doMan('mane', coords)
-
-def drawMans(coords):
-    doMan('mans', coords)
-
-def drawManw(coords):
-    doMan('manw', coords)
-
-def drawManN(coords):
-    doMan('manN', coords)
-
-def drawManE(coords):
-    doMan('manE', coords)
-
-def drawManS(coords):
-    doMan('manS', coords)
-
-def drawManW(coords):
-    doMan('manW', coords)
-
-def drawTreasure(coords):
-    doMan('treasure', coords)
-
-def drawArrown(coords):
-    doMan('arrown', coords)
-
-def drawArrowe(coords):
-    doMan('arrowe', coords)
-
-def drawArrows(coords):
-    doMan('arrows', coords)
-
-def drawArroww(coords):
-    doMan('arroww', coords)
-
-def doName(font, background, name):
-    text = font.render("Name " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doMap(font, background, name):
-    text = font.render("Map " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*2
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doRoom(font, background, name):
-    text = font.render("Room " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*3
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doWounds(font, background, name):
-    text = font.render("Wounds " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*5
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doFatigue(font, background, name):
-    text = font.render("Fatigue " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*6
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doMagic(font, background, name):
-    text = font.render("Magic " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*8
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doArrows(font, background, name):
-    text = font.render("Arrows " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*9
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doWeight(font, background, name):
-    text = font.render("Weight " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*11
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doTime(font, background, name):
-    text = font.render("Time " + name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*12
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doCommand(font, background, ch, desc):
-    text = font.render("Command " + ch, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*14
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-    text = font.render(desc, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*15
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def drawWriteLn(name):
-    global font, background, lineNo, columnNo, textLine
-    text = font.render(name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*lineNo
-    textpos.left = background.get_rect().left
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    lineNo = lineNo+1
-    columnNo = [0]
-    textLine = ""
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawWriteString(name):
-    global textLine
-    drawPutCh(name)
-    textLine = ""
-
-def drawPutCh(name):
-    global font, background, lineNo, columnNo, textLine
-    text = font.render(name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*lineNo
-    textpos.left = columnNo[-1]
-    textLine += name
-    columnNo = columnNo + [textpos.right]
-    background.blit(text, textpos)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def eraseCh():
-    global font, background, lineNo, columnNo, textLine
-
-    if len(columnNo)>0 and len(textLine)>0:
-        columnNo = columnNo[:-1]
-        text = font.render(textLine[-1], 1, Black)
-        textLine = textLine[:-1]
-        textpos = text.get_rect()
-        textpos.top = background.get_rect().top+LineHeight*lineNo
-        textpos.left = columnNo[-1]
-        background.blit(text, textpos)
-        screen.blit(background, (0, 0))
-        pygame.display.flip()
-
-def doComment1(font, background, name):
-    text = font.render(name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*17
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doComment2(font, background, name):
-    text = font.render(name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*18
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doComment3(font, background, name):
-    text = font.render(name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*19
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doComment4(font, background, name):
-    text = font.render(name, 1, White)
-    textpos = text.get_rect()
-    textpos.top = background.get_rect().top+LineHeight*20
-    textpos.left = background.get_rect().right-StatusWidth
-    blanktext = pygame.Rect(textpos.left, textpos.top,
-                            StatusWidth, LineHeight)
-    pygame.draw.rect(background, Black, blanktext)
-    background.blit(text, textpos)
-
-def doStatus(background):
-    global screen, font
-    # Display some text
-    doName(font, background, "")
-    doMap(font, background, "")
-    doRoom(font, background, "")
-    doFatigue(font, background, "")
-    doWounds(font, background, "")
-    doMagic(font, background, "")
-    doArrows(font, background, "")
-    doWeight(font, background, "")
-    doTime(font, background, "")
-    doCommand(font, background, "", "")
-    doComment1(font, background, "")
-    doComment2(font, background, "")
-    doComment3(font, background, "")
-    doComment4(font, background, "")
-
-    # Blit everything to the screen
-    screen.blit(background, (0, 0))
-
-def doClear():
-    global screen, background, lineNo
-    # erase the screen
-    # background = pygame.Surface(screen.get_size())
-    # background = background.convert()
-    background.fill(Black)
-    # Blit everything to the screen
-    lineNo = 0
-    # screen.fill(Black)
-    screen.blit(background, (0, 0))
-    # screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawStatus():
-    global screen, background
-    doStatus(background)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def doSync():
-    global historyList
-    historyList = []
-
-def doErase(font, background, x, y):
-    blanktext = pygame.Rect(background.get_rect().left+UnitX * x,
-                            background.get_rect().top+UnitY * y,
-                            UnitX, UnitY)
-    pygame.draw.rect(background, Black, blanktext)
-
-def eraseLine(coords):
-    global screen, background
-    global background, images
-
-    if len(coords) == 2:
-        doErase(font, background, int(coords[0]), int(coords[1]))
-    elif coords[0] == coords[2]:
-        for i in range(int(coords[1]), int(coords[3])+1):
-            doErase(font, background, int(coords[0]), i)
-    elif coords[1] == coords[3]:
-        for i in range(int(coords[0]), int(coords[2])+1):
-            doErase(font, background, i, int(coords[1]))
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawCommand(font, background, ch, cmd):
-    doCommand(font, background, ch, cmd)
-    pygame.display.flip()
-
-def doFlush():
-    global background, screen
-
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def processLine(line):
-    global font, background
-
-    cmd = line.split ()
-    if line == 'sync':
-        doSync()
-    elif line == 'fl':
-        doFlush()
-    elif line == 'quit' or line == 'abort':
-        return
-    elif line == 'clear':
-        doClear()
-    elif line == 'status':
-        drawStatus()
-    elif cmd[0] == 'dWriteLn':
-        drawWriteLn(line[9:])
-    elif cmd[0] == 'dWriteStr':
-        drawWriteString(line[10:])
-    elif cmd[0] == 'dC':
-        drawPutCh(cmd[1])
-    elif line == 'eC':
-        eraseCh()
-    elif cmd[0] == 'dN':
-        drawName(font, background, line[3:])
-    elif cmd[0] == 'dMap':
-        drawMap(font, background, line[5:])
-    elif cmd[0] == 'dC1':
-        drawComment1(font, background, line[4:])
-    elif cmd[0] == 'dC2':
-        drawComment2(font, background, line[4:])
-    elif cmd[0] == 'dC3':
-        drawComment3(font, background, line[4:])
-    elif cmd[0] == 'dC4':
-        drawComment4(font, background, line[4:])
-    elif len(cmd)>1:
-        if cmd[0] == 'dCMD':
-            drawCommand(font, background, cmd[1], line[(len(cmd[0])+3):])
-        elif cmd[0] == 'eman':
-            drawMane(cmd[1:])
-        elif cmd[0] == 'wman':
-            drawManw(cmd[1:])
-        elif cmd[0] == 'nman':
-            drawMann(cmd[1:])
-        elif cmd[0] == 'sman':
-            drawMans(cmd[1:])
-        elif cmd[0] == 'Eman':
-            drawManE(cmd[1:])
-        elif cmd[0] == 'Wman':
-            drawManW(cmd[1:])
-        elif cmd[0] == 'Nman':
-            drawManN(cmd[1:])
-        elif cmd[0] == 'Sman':
-            drawManS(cmd[1:])
-        elif cmd[0] == 'hwall':
-            drawHorizWall(cmd[1:])
-        elif cmd[0] == 'vwall':
-            drawVertWall(cmd[1:])
-        elif cmd[0] == 'hdoor':
-            drawHorizDoor(cmd[1:])
-        elif cmd[0] == 'vdoor':
-            drawVertDoor(cmd[1:])
-        elif cmd[0] == 'hhinge':
-            drawHorizHinge(cmd[1:])
-        elif cmd[0] == 'vhinge':
-            drawVertHinge(cmd[1:])
-        elif cmd[0] == 'treasure':
-            drawTreasure(cmd[1:])
-        elif cmd[0] == 'war':
-            drawArroww(cmd[1:])
-        elif cmd[0] == 'ear':
-            drawArrowe(cmd[1:])
-        elif cmd[0] == 'nar':
-            drawArrown(cmd[1:])
-        elif cmd[0] == 'sar':
-            drawArrows(cmd[1:])
-        elif cmd[0] == 'dW':
-            drawWounds(font, background, cmd[1])
-        elif cmd[0] == 'dF':
-            drawFatigue(font, background, cmd[1])
-        elif cmd[0] == 'dA':
-            drawArrow(font, background, cmd[1])
-        elif cmd[0] == 'dM':
-            drawMagic(font, background, cmd[1])
-        elif cmd[0] == 'dR':
-            drawRoom(font, background, cmd[1])
-        elif cmd[0] == 'dw':
-            drawWeight(font, background, cmd[1])
-        elif cmd[0] == 'dT':
-            drawTime(font, background, cmd[1])
-        elif cmd[0] == 'pS':
-            playSound(cmd[1])
-        elif cmd[0] == 'eL':
-            eraseLine(cmd[1:])
-        else:
-            print(("Warning unknown command ", line))
-    else:
-        print(("Warning unknown command ", line))
-
-def playSound(sound):
-    global soundDict
-    if sound in soundDict:
-       soundDict[sound].play()
-    else:
-       print(("no sound file ", sound, " found"))
-
-def drawMap(font, background, cmd):
-    doMap(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawName(font, background, cmd):
-    doName(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawRoom(font, background, cmd):
-    doRoom(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawWounds(font, background, cmd):
-    doWounds(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawFatigue(font, background, cmd):
-    doFatigue(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawArrow(font, background, cmd):
-    doArrows(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawMagic(font, background, cmd):
-    doMagic(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawComment1(font, background, cmd):
-    doComment1(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawComment2(font, background, cmd):
-    doComment2(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawComment3(font, background, cmd):
-    doComment3(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawComment4(font, background, cmd):
-    doComment4(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawWeight(font, background, cmd):
-    doWeight(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def drawTime(font, background, cmd):
-    doTime(font, background, cmd)
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-
-def stripcrlf(s):
-    return s[:-1]
-
-def connectServer(id, count):
-    global historyList, sckt, serverName, portNumber, debugging
-
-    # s = open('testscript', 'r')
-    # line = s.readline()
-    while True:
-        sckt = socket(AF_INET, SOCK_STREAM)
-        print(("attempting to connect to %s:%d" % (serverName, portNumber)))
-        try:
-            sckt.connect ((serverName, portNumber))
-            break
-        except error as why:
-            print (("cannot find server on %s:%d" % (serverName, portNumber)))
-            count -= 1
-            if count>0:
-                print("will try again")
-                portNumber += 1
-            else:
-                print (("cannot connect to %s:%d the server is probably not running or it is not accessible" % (serverName, portNumber)))
-                pygame.event.post(pygame.event.Event(USEREVENT, serverLine='abort'))
-                sys.exit(0)
-
-    f = sckt.makefile("rb")
-    line = stripcrlf(f.readline().decode ('utf-8'))
-    while line:
-        if debugging == 1:
-            print(line)
-        pygame.event.post(pygame.event.Event(USEREVENT, serverLine=line))
-        pygame.time.set_timer(USEREVENT, 0)
-        # pygame.time.delay(200)
-        # line = s.readline()
-        line = stripcrlf(f.readline().decode ('utf-8'))
-    if debugging == 1:
-        print(("line =", line, " thus stopping"))
-    pygame.event.post(pygame.event.Event(USEREVENT, serverLine="quit"))
-    pygame.time.set_timer(USEREVENT, 0)
-
-def initEventLoop():
-    global sckt, debugging
-
-    _thread.start_new(connectServer, (1, connectAttempts))
-    while True:
-        for event in pygame.event.get():
-            if (event.type == KEYDOWN):
-                # print "key is", event.key, pygame.key.name(event.key)
-                if event.key<256:
-                    sckt.send(chr(event.key).encode ('utf-8'))
-                if (event.key == K_ESCAPE):
-                    screen = pygame.display.set_mode((640, 480))
-                    sys.exit(0)
-            elif event.type == USEREVENT:
-                line = event.serverLine
-                if debugging == 1:
-                    print(("about to process", line))
-                processLine(line)
-                if line != 'sync':
-                    historyList.append([line, pygame.time.get_ticks()])
-                if line == 'quit':
-                    return
-                if line == 'abort':
-                    sys.exit(0)
-
-
-def replayHistory():
-    global historyList
-    lastTime = -1
-
-    for t in historyList:
-        if lastTime == -1:
-           lastTime = t[1]
-        else:
-           pygame.time.delay(t[1]-lastTime)
-           lastTime = t[1]
-        processLine(t[0])
-
-def getAnswer():
-    while 1:
-        for event in pygame.event.get():
-            if (event.type == KEYUP) or (event.type == KEYDOWN):
-                if (event.key == K_y):
-                    return "y"
-                elif (event.key == K_n):
-                    return "n"
-                if (event.key == K_ESCAPE):
-                    screen = pygame.display.set_mode((640, 480))
-                    sys.exit(0)
-
-def askReplayHistory():
-    global screen, font
-    drawComment4(font, background, "see replay?")
-    if getAnswer() == 'y':
-       replayHistory()
-    else:
-       drawComment4(font, background, "goodbye")
-       playSound('exit')
-
-
-def handleArgs ():
-    global fullscreen, versionNumber, serverName, portNumber, debugging, dataDirectory
-
-    try:
-       optlist, list = getopt.getopt(sys.argv[1:], ':vdhwfI:')
-    except getopt.GetoptError:
-       Usage()
-       sys.exit(0)
-
-    for opt in optlist:
-        if opt[0] == '-h':
-            Usage()
-        if opt[0] == '-d':
-            debugging = 1
-        if opt[0] == '-w' or opt[0] == '-f':
-            fullscreen = FULLSCREEN
-        if opt[0] == '-I':
-            dataDirectory = opt[1]
-        if opt[0] == '-v':
-            printf ("%s version %s\n", programName, versionNumber)
-            sys.exit (0)
-    if len(list)>0:
-        url = list[0].split (":")
-        serverName = url[0]
-        portNumber = int(url[1])
-"""
 
 def handle_arguments ():
     # handle_arguments create and return the args object.
     parser = argparse.ArgumentParser ()
-    parser.add_argument ('-d', '--debug', help='turn on internal debugging.',
+    parser.add_argument ('-d', '--debug', help='turn on internal debug.',
                          default=False, action='store_true')
     parser.add_argument ('-f', '--full',
                          help='run in full screen rather than a window.',
@@ -774,12 +26,37 @@ def handle_arguments ():
                          default=False, action='store_true')
     parser.add_argument ('-s', '--server',
                          help='the server name running ptower.',
-                         default=localhost, action='store_value')
+                         default='localhost')
+    parser.add_argument ('-n', '--name',
+                         help='your player name.',
+                         default=None)
     parser.add_argument ('-I', '--include',
                          help='search directory for the game assets.',
                          default=None)
+    parser.add_argument ('-p', '--port',
+                         help='the server port number.',
+                         default=7000)
+    parser.add_argument ('-k', '--skin',
+                         help='the skin number 1. Male Adv, 2. Female Adv, 3. Male, 4. Female, 5. Zombie, 6. Robot',
+                         default=1)
     args = parser.parse_args ()
     return args
+
+
+def load_sound(name):
+    class NoneSound:
+        def play(self):
+            pass # pass means {} in C, C++ or Java
+    if not pygame.mixer or not pygame.mixer.get_init ():
+        return NoneSound ()
+    return NoneSound () ### --fixme--
+    fullname = get_file_name ('sounds', name)
+    try:
+        sound = pygame.mixer.Sound (fullname)
+    except pygame.error as message:
+        _printf ('cannot load sound file: %s\n', fullname)
+        return NoneSound ()
+    return sound
 
 
 def add_sound (name):
@@ -797,11 +74,35 @@ def init_sounds ():
         add_sound (sound)
 
 
-def init_game_client (character):
-    init_sounds ()
-    init_event_loop (character)
+def init_game_client (character, name):
+    # init_sounds ()
+    init_event_loop (character, name)
     ask_replay_history ()
     finish_game ()
+
+
+def get_file_name (subdir, filename):
+    global args
+
+    if args.include is None:
+        return os.path.join (subdir, filename)
+    else:
+        return os.path.join (args.include, os.path.join (subdir, filename))
+
+
+def load_png (name):
+    """ Load image and return image object"""
+    fullname = get_file_name ('data', name)
+    try:
+        image = pygame.image.load (fullname)
+        if image.get_alpha () is None:
+            image = image.convert ()
+        else:
+            image = image.convert_alpha ()
+    except pygame.error as message:
+        _printf ('Cannot load image: %s\n', fullname)
+        raise SystemExit (message)
+    return image
 
 
 def load_static_images ():
@@ -818,65 +119,119 @@ def init_graphics ():
     global screen, font, background, fullscreen
 
     pygame.init ()
-    screen = pygame.display.set_mode (Resolution, config.fullscreen)
+    screen = pygame.display.set_mode (config.Resolution, config.fullscreen)
     pygame.display.set_caption (config.GameTitle)
     font = pygame.font.Font (None, config.FontSize)
-
     pygame.mouse.set_visible (False)
     load_static_images ()
     background = pygame.Surface (screen.get_size ())
 
 
-def connectServer(id, count):
-    global historyList, sckt, serverName, portNumber, debugging
+def add_queue (entry):
+    global anim_queue
+
+    if anim_queue == []:
+        pygame.time.set_timer (ANIM_EVENT, 100)
+    anim_queue += [entry]
+
+
+def movement (words, animation):
+    print (words, animation)
+    _printf ("unitX = %d\n", config.UnitX)
+    add_queue ([anim.anim (player_char, player_char.get_pose (animation),
+                           char (config.UnitX * int (words[1]), config.UnitY * int (words[2]),
+                                 [animation]), redraw, finished), words[-1]])
+
+
+def func_nman (words):
+    print (words)
+
+
+def func_eman (words):
+    movement (words, "think")
+
+
+def func_sman (words):
+    print (words)
+
+
+def func_wman (words):
+    print (words)
+
+
+def func_animerun (words):
+    movement (words, "run")
+
+
+function_calls = { "nman": func_nman,
+                   "eman": func_eman,
+                   "sman": func_sman,
+                   "wman": func_wman,
+                   "animerun": func_animerun }
+
+
+def process_line (line, in_combat):
+    _printf ("process_line: %s\n", line)
+    words = line.split ()
+    if len (words) > 0:
+        if words[0] == "combat":
+            return True
+        elif words[0] in function_calls:
+            function_calls[words[0]] (words)
+    return in_combat
+
+
+def stripcrlf(s):
+    return s[:-1]
+
+
+def create_socket (count):
+    port = args.port
+    while True:
+        sckt = socket (AF_INET, SOCK_STREAM)
+        # _printf ("attempting to connect to %s:%d\n", args.server, port)
+        try:
+            sckt.connect ((args.server, args.port))
+            return sckt
+        except error as why:
+            _printf ("cannot find server on %s:%d\n", args.server, port)
+            count -= 1
+            if count > 0:
+                port += 1
+            else:
+                _printf ("cannot connect to %s:%d the server is probably not running or it is not accessible\n",
+                         args.server, port)
+                pygame.event.post (pygame.event.Event (USEREVENT, serverLine = 'abort'))
+                sys.exit (0)
+
+
+def connect_server (id, count):
+    global sckt, args
 
     # s = open('testscript', 'r')
     # line = s.readline()
-    while True:
-        sckt = socket(AF_INET, SOCK_STREAM)
-        print(("attempting to connect to %s:%d" % (serverName, portNumber)))
-        try:
-            sckt.connect ((serverName, portNumber))
-            break
-        except error as why:
-            print (("cannot find server on %s:%d" % (serverName, portNumber)))
-            count -= 1
-            if count>0:
-                print("will try again")
-                portNumber += 1
-            else:
-                print (("cannot connect to %s:%d the server is probably not running or it is not accessible" % (serverName, portNumber)))
-                pygame.event.post(pygame.event.Event(USEREVENT, serverLine='abort'))
-                sys.exit(0)
-
     f = sckt.makefile ("rb")
-    line = stripcrlf(f.readline().decode ('utf-8'))
+    line = stripcrlf (f.readline ().decode ('utf-8'))
     while line:
-        if debugging:
-            print(line)
-        pygame.event.post(pygame.event.Event(USEREVENT, serverLine=line))
-        pygame.time.set_timer(USEREVENT, 0)
-        # pygame.time.delay(200)
-        # line = s.readline()
-        line = stripcrlf(f.readline().decode ('utf-8'))
-    if debugging:
-        print(("line =", line, " thus stopping"))
-    pygame.event.post(pygame.event.Event(USEREVENT, serverLine="quit"))
-    pygame.time.set_timer(USEREVENT, 0)
+        pygame.event.post (pygame.event.Event (USEREVENT, server_line = line))
+        pygame.time.set_timer (USEREVENT, 0)
+        line = stripcrlf (f.readline ().decode ('utf-8'))
+    pygame.event.post (pygame.event.Event (USEREVENT, server_line = "quit"))
+    pygame.time.set_timer (USEREVENT, 0)
 
 
 def handle_direction (direction, sckt, newdir):
     if direction == newdir:
-        sckt.send('1'.encode ('utf-8'))
+        sckt.send ('1'.encode ('utf-8'))
         return direction, sckt
     else:
         direction = (direction + 4 - newdir) % 4
         if direction == 2:
-            sckt.send('v'.encode ('utf-8'))
+            sckt.send ('v'.encode ('utf-8'))
         elif direction == 1:
-            sckt.send('l'.encode ('utf-8'))
+            sckt.send ('l'.encode ('utf-8'))
         else:
-            sckt.send('r'.encode ('utf-8'))
+            sckt.send ('r'.encode ('utf-8'))
     return newdir, sckt
 
 
@@ -890,11 +245,39 @@ def update_direction (direction, key):
     return direction
 
 
-def init_event_loop (character):
-    global sckt, debugging
+def select_character (sckt, character, name):
+    push_back = "\n" + character + "\n"
+    if name != None:
+        push_back += name + "\n"
+    for ch in push_back:
+        sckt.send (ch.encode ('utf-8'))
+    return sckt
 
+
+def advance_anim ():
+    global form, screen, anim_queue
+
+    if form.finished () and (anim_queue != []):
+        form.add_anim (anim_queue[0][0])
+        delay = anim_queue[0][1]
+        if len (anim_queue) == 1:
+            anim_queue = []
+        else:
+            anim_queue = anim_queue[1:]
+    if not form.finished ():
+        screen.fill (config.Black)
+        if form.update ():
+            pygame.display.flip ()
+        pygame.time.set_timer (ANIM_EVENT, 100)
+
+
+def init_event_loop (character, name):
+    global sckt, args
+
+    _printf ("init_event_loop = %s\n", character)
+    sckt = create_socket (config.ConnectAttempts)
     in_combat = False
-    _thread.start_new (connectServer, (1, connectAttempts))
+    _thread.start_new (connect_server, (1, config.ConnectAttempts))
     direction = 0
     direction_dict = {
         pygame.K_LEFT: 3,
@@ -902,50 +285,118 @@ def init_event_loop (character):
         pygame.K_UP: 0,
         pygame.K_DOWN: 2,
     }
-    push_back = "\n" + character + "\n"
-    sckt_ready = False
+    sckt = select_character (sckt, character, name)
     while True:
         for event in pygame.event.get ():
-            if sckt_ready and len (push_back) > 0:
-                sckt.send (push_back[0].encode ('utf-8'))
-                if len (push_back) == 1:
-                    push_back = ""
-                else:
-                    push_back = push_back[1:]
             if (event.type == KEYDOWN):
                 if in_combat:
                     if event.key == pygame.K_F11:
                         pygame.display.toggle_fullscreen ()
                     elif event.key == pygame.K_F12:
-                        sckt.send ("~!".encode ('utf-8'))
+                        sckt.send (TOGGLE_ANIM.encode ('utf-8'))
                     if event.key in direction_dict:
                         direction, sckt = handle_direction (direction, sckt, direction_dict[event.key])
-                    elif event.key<256:
-                        direction = update_direction (direction, chr(event.key))
+                    elif event.key < 256:
+                        direction = update_direction (direction, chr (event.key))
                         sckt.send (chr (event.key).encode ('utf-8'))
                 else:
+                    _printf ("sending %c\n", chr (event.key))
                     sckt.send (chr (event.key).encode ('utf-8'))
-                if (event.key == K_ESCAPE):
-                    screen = pygame.display.set_mode((640, 480))
-                    sys.exit(0)
+                if event.key == K_ESCAPE:
+                    screen = pygame.display.set_mode ((640, 480))
+                    sys.exit (0)
             elif event.type == USEREVENT:
-                line = event.serverLine
-                if debugging:
-                    print(("about to process", line))
-                in_combat = processLine (line, in_combat)
-                sckt_ready = True
+                line = event.server_line
+                if args.debug:
+                    _printf ("about to process: %s\n", line)
+                old_in_combat = in_combat
+                in_combat = process_line (line, in_combat)
+                if (old_in_combat != in_combat) and in_combat:
+                    # turn anim on
+                    sckt.send (TOGGLE_ANIM.encode ('utf-8'))
                 if line != 'sync':
-                    historyList.append ([line, pygame.time.get_ticks()])
+                    history_list.append ([line, pygame.time.get_ticks ()])
                 if line == 'quit':
                     return
                 if line == 'abort':
-                    sys.exit(0)
+                    sys.exit (0)
+            elif event.type == ANIM_EVENT:
+                advance_anim ()
 
 
-def main():
-    handle_arguments ()
+skin_name = { 1: "Male adventurer",
+              2: "Female adventurer",
+              3: "Male person",
+              4: "Female person",
+              5: "Zombie",
+              6: "Robot" }
+
+player_char = None
+form = None
+
+class moving:
+    def __init__ (self, x_origin, y_origin):
+        self.x_origin = x_origin
+        self.y_origin = y_origin
+        printf ("inside moving constructor:  %g and %g\n", x_origin, y_origin)
+    def refresh (self):
+        printf ("image: %s for %d ticks\n", self.name, self.unit)
+
+
+def all_done (args):
+    printf ("all_done called: %s\n", args)
+
+
+class char:
+    def __init__ (self, x_offset, y_offset, test_list):
+        self.x_offset = x_offset
+        self.y_offset = y_offset
+        self.test_list = test_list
+        self.current = 0
+    def get_anim_name (self):
+        return self.test_list [self.current]
+    def move_next (self):
+        self.current += 1
+        self.current %= len (self.test_list)
+
+
+def x_scale (value):
+    return int (value * config.MaxX)
+
+def y_scale (value):
+    return int (value * config.MaxY)
+
+def redraw (char_object, anim_object, animation_object):
+    global screen
+    ob = anim_object.get_attributes ()
+    image = pygame.image.load (ob[0]).convert ()
+    rect = image.get_rect ()
+    rect.topleft = [char_object.x_offset, char_object.y_offset]
+    char_object.x_offset += ob[2]
+    char_object.y_offset += ob[3]
+    screen.blit (image, rect)
+
+
+def finished (char_object, anim_object, animation_object):
+    global form
+    char_object.move_next ()
+    _printf ("moving onto: %s\n", char_object.get_anim_name ())
+    if not form.finished ():
+        form.add_anim (anim.anim (animation_object, animation_object.get_pose (char_object.get_anim_name ()), char_object, redraw, finished))
+
+
+def init_animations (name):
+    global player_char, form
+    player_char = anim.animation (name)
+    form = anim.form ()
+
+
+def main ():
+    global args
+    args = handle_arguments ()
     init_graphics ()
-    init_game_client ("human")
+    init_animations (skin_name[args.skin])
+    init_game_client ("human", args.name)
 
 #this calls the 'main' function when this script is executed
 if __name__ == '__main__': main ()

@@ -31,7 +31,7 @@ PROCEDURE DisplayMessage (a1, a2, a3: ARRAY OF CHAR) ;
 
 PROCEDURE AnimEraseMan (p: CARDINAL) ;
 
-PROCEDURE AnimMoveMan (p, s, n, dir: CARDINAL) ;
+PROCEDURE AnimMoveMan (p, s, n, dir, delay: CARDINAL) ;
 
 
 END DrawG.

@@ -299,7 +299,7 @@ END StrLine ;
 
 
 PROCEDURE StrMove (direction: ARRAY OF CHAR; command: ARRAY OF CHAR;
-                   x1, y1, x2, y2, stepno, total: CARDINAL) ;
+                   x1, y1, x2, y2, stepno, total, delay: CARDINAL) ;
 BEGIN
    WriteString (direction) ;
    WriteString (command) ; Write(' ') ;
@@ -308,7 +308,8 @@ BEGIN
    WriteCard (x2, 0) ; Write(' ') ;
    WriteCard (y2, 0) ; Write(' ') ;
    WriteCard (stepno, 0) ; Write(' ') ;
-   WriteCard (total, 0) ; WriteLn
+   WriteCard (total, 0) ;  Write(' ') ;
+   WriteCard (delay, 0) ; WriteLn
 END StrMove ;
 
 
@@ -427,7 +428,7 @@ BEGIN
 END AnimEraseMan ;
 
 
-PROCEDURE AnimMoveMan (other: BOOLEAN; fromx, fromy, tox, toy, dir, stepno, total: CARDINAL) ;
+PROCEDURE AnimMoveMan (other: BOOLEAN; fromx, fromy, tox, toy, dir, stepno, total, delay: CARDINAL) ;
 VAR
    command: ARRAY [0..20] OF CHAR ;
 BEGIN
@@ -441,10 +442,10 @@ BEGIN
    THEN
       CASE dir OF
 
-      0:  StrMove ('animN', command, fromx, fromy, tox, toy, stepno, total) |
-      1:  StrMove ('animW', command, fromx, fromy, tox, toy, stepno, total) |
-      2:  StrMove ('animS', command, fromx, fromy, tox, toy, stepno, total) |
-      3:  StrMove ('animE', command, fromx, fromy, tox, toy, stepno, total)
+      0:  StrMove ('animN', command, fromx, fromy, tox, toy, stepno, total, delay) |
+      1:  StrMove ('animW', command, fromx, fromy, tox, toy, stepno, total, delay) |
+      2:  StrMove ('animS', command, fromx, fromy, tox, toy, stepno, total, delay) |
+      3:  StrMove ('animE', command, fromx, fromy, tox, toy, stepno, total, delay)
 
       ELSE
          Halt ('unexpected direction', __FILE__, __FUNCTION__, __LINE__)
@@ -452,10 +453,10 @@ BEGIN
    ELSE
       CASE dir OF
 
-      0:  StrMove ('animn', command, fromx, fromy, tox, toy, stepno, total) |
-      1:  StrMove ('animw', command, fromx, fromy, tox, toy, stepno, total) |
-      2:  StrMove ('anims', command, fromx, fromy, tox, toy, stepno, total) |
-      3:  StrMove ('anime', command, fromx, fromy, tox, toy, stepno, total)
+      0:  StrMove ('animn', command, fromx, fromy, tox, toy, stepno, total, delay) |
+      1:  StrMove ('animw', command, fromx, fromy, tox, toy, stepno, total, delay) |
+      2:  StrMove ('anims', command, fromx, fromy, tox, toy, stepno, total, delay) |
+      3:  StrMove ('anime', command, fromx, fromy, tox, toy, stepno, total, delay)
 
       ELSE
          Halt ('unexpected direction', __FILE__, __FUNCTION__, __LINE__)

@@ -813,7 +813,7 @@ BEGIN
                      hit := PointOnOtherPlayer(i, j, z) ;
                      IF NOT hit
                      THEN
-                        AnimMoveMan (p, s, n, dir) ;
+                        AnimMoveMan (p, s, n, dir, delayPerSquare) ;
                         x := i ;
                         y := j ;
                         INC (s) ;

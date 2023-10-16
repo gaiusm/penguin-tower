@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([penguin-tower], [2.0], [gaiusmod2@gmail.com])
-AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+AC_INIT([penguin-tower], [3.0], [gaiusmod2@gmail.com])
+AM_INIT_AUTOMAKE([-Wno-portability])
 AC_CONFIG_SRCDIR([version.c])
 
 AC_PROG_AWK
