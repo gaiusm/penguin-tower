@@ -296,7 +296,7 @@ END IsaPlayer ;
 
 PROCEDURE FindFreePlayer () : INTEGER ;
 VAR
-   i : INTEGER ;
+   c : CARDINAL ;
    pc: POINTER TO CARDINAL ;
 BEGIN
    IF NextFreePlayer<=MaxNoOfPlayers
@@ -304,34 +304,34 @@ BEGIN
       IF NextFreePlayer>0
       THEN
          (* reuse an old player who has left the game *)
-         FOR i := 0 TO NextFreePlayer-1 DO
-            WITH Player[i] DO
+         FOR c := 0 TO NextFreePlayer-1 DO
+            WITH Player[c] DO
                IF fd=-1
                THEN
                   Entity.Weight := GetEntityWeightDefault (human) ;
                   Entity.TreasureOwn := {} ;
-                  RETURN( i )
+                  RETURN VAL (INTEGER, c)
                END
             END
          END
       END ;
-      i := NextFreePlayer ;
+      c := NextFreePlayer ;
       INC(NextFreePlayer) ;
-      WITH Player[i] DO
+      WITH Player[c] DO
          Entity.Weight := GetEntityWeightDefault (human) ;
          Entity.TreasureOwn := {} ;
          NormalProcArgs := InitArgs() ;
          MagicProcArgs := InitArgs() ;
          NEW(pc) ;
-         pc^ := i ;
+         pc^ := c ;
          MagicP := Resume(InitProcess(MagicArrowP, ArrowProcessSize, 'Magic Arrow')) ;
          pc := SetArgs(PArgs, pc) ;
          NormalP := Resume(InitProcess(NormalArrowP, ArrowProcessSize, 'Normal Arrow')) ;
          NEW(pc) ;
-         pc^ := i ;
+         pc^ := c ;
          pc := SetArgs(PArgs, pc)
       END ;
-      RETURN( i )
+      RETURN VAL (INTEGER, c)
    ELSE
       RETURN( -1 )
    END

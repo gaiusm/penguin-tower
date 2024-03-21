@@ -2,7 +2,7 @@ SUFFIXES = .c .mod .def .d .o
 
 DEPFLAGS=-MMD -MT $@ -MP -MF .deps/$*.d
 
-DEPS = AdvCmd.o \
+M2DEPS = AdvCmd.o \
        AdvIntroduction.o \
        AdvMap.o \
        AdvMath.o \
@@ -16,9 +16,11 @@ DEPS = AdvCmd.o \
        Lock.o \
        ProcArgs.o \
        Screen.o \
-       Window.o \
-       SocketControl.o \
-       advflex.o
+       Window.o
+
+DEPS = $(M2DEPS) \
+       advflex.o \
+       SocketControl.o
 
 # OPT=-O0 -fm2-g -g -flto
 OPT=-O0
@@ -43,30 +45,34 @@ ptower_SOURCES = AdvCmd.mod \
        ProcArgs.mod \
        Screen.mod \
        Window.mod \
-       SocketControl.c \
-       advflex.c
+       SocketControl.c
 
 ptower_LDADD = advflex.o SocketControl.o
 
 ptower$(EXEEXT): $(DEPS)
 	gm2 $(M2FLAGS) -I. -I$(srcdir) $(srcdir)/Dungeon.mod $(DEPS) -o $@
 
-advflex.c: $(srcdir)/adv.flex
-	flex -t $< > $@
-
 # $(srcdir)/AdvParse.mod: $(srcdir)/AdvParse.bnf
 
-.deps: ; @mkdir -p $@
+.deps:
+	mkdir -p $@
 
 %.o: %.mod .deps/%.d
-	@test -z .deps || mkdir -p .deps
+	echo $(DEPFILES)
+	test -z .deps || mkdir -p .deps
 	gm2 $(DEPFLAGS) $(M2FLAGS) -I. -I$(srcdir) -c $<
 
 .c.o:
-	gcc -c -O0 -g $<
+	test -z .deps || mkdir -p .deps
+	gcc $(DEPFLAGS) -c -O0 -g $<
+
+advflex.c: $(srcdir)/adv.flex
+	test -z .deps || mkdir -p .deps
+	flex -t $< > $@
 
 DEPFILES=$(ptower_SOURCES:%.mod=.deps/%.d)
 
 $(DEPFILES):
+	echo "Value of DEPFILES = $(DEPFILES)"
 
 include $(wildcard $(DEPFILES))
